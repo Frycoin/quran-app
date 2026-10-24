@@ -9,9 +9,6 @@ void main() {
   runApp(const QuranWarshTajweedApp());
 }
 
-// ==========================================
-// 1. التطبيق الرئيسي وإعدادات الثيم
-// ==========================================
 class QuranWarshTajweedApp extends StatelessWidget {
   const QuranWarshTajweedApp({super.key});
 
@@ -22,12 +19,12 @@ class QuranWarshTajweedApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFDFBF7), // بيج فاتح مريح للعين
-        primaryColor: const Color(0xFF0A4D3C), // زمردي داكن
+        scaffoldBackgroundColor: const Color(0xFFFDFBF7),
+        primaryColor: const Color(0xFF0A4D3C),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0A4D3C),
           primary: const Color(0xFF0A4D3C),
-          secondary: const Color(0xFFD4AF37), // ذهبي إسلامي
+          secondary: const Color(0xFFD4AF37),
           surface: const Color(0xFFFDFBF7),
         ),
         appBarTheme: const AppBarTheme(
@@ -35,19 +32,6 @@ class QuranWarshTajweedApp extends StatelessWidget {
           foregroundColor: Colors.white,
           centerTitle: true,
           elevation: 2,
-          titleTextStyle: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFDFBF7),
-          ),
-        ),
-        cardTheme: CardTheme(
-          color: Colors.white,
-          elevation: 1.5,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFE6DEC8), width: 1),
-          ),
         ),
       ),
       builder: (context, child) {
@@ -61,9 +45,6 @@ class QuranWarshTajweedApp extends StatelessWidget {
   }
 }
 
-// ==========================================
-// 2. نماذج البيانات والبيانات الثابتة (114 سورة)
-// ==========================================
 class SurahModel {
   final int number;
   final String name;
@@ -253,30 +234,17 @@ const List<SurahModel> kAllSurahs = [
   SurahModel(number: 114, name: "الناس", revelationType: "مكية", versesCount: 6),
 ];
 
-// ==========================================
-// 3. محلل علامات التجويد الملون (Tajweed Parser)
-// ==========================================
 class TajweedParser {
-  // ألوان أحكام التجويد المعتمدة في مصحف التجويد الملون
   static const Map<String, Color> ruleColors = {
-    'ghunnah': Color(0xFF169777), // أخضر: غنة / إخفاء / إدغام بغنة
-    'ikhafa': Color(0xFF169777),
-    'ikhafa_shafawi': Color(0xFF169777),
-    'idgham_ghunnah': Color(0xFF169777),
-    'idgham_shafawi': Color(0xFF169777),
-    'iqlab': Color(0xFF26BFFD), // أزرق سماوي: إقلاب
-    'qalqalah': Color(0xFF0055FF), // أزرق داكن: قلقلة (قطب جد)
-    'madd_normal': Color(0xFFD48B00), // برتقالي/ذهبي: مد طبيعي
-    'madd_permissible': Color(0xFFFF6600), // برتقالي داكن: مد جائز منفصل
-    'madd_obligatory': Color(0xFFD50000), // أحمر: مد واجب متصل
-    'madd_necessary': Color(0xFF9E0000), // أحمر قاني: مد لازم
-    'ham_wasl': Color(0xFF9E9E9E), // رمادي: همزة وصل / حروف لا تنطق
-    'slnt': Color(0xFF9E9E9E),
-    'laam_shamsiyah': Color(0xFF9E9E9E),
-    'idgham_wo_ghunnah': Color(0xFF795548), // بني: إدغام بغير غنة
+    'ghunnah': Color(0xFF169777),
+    'iqlab': Color(0xFF26BFFD),
+    'qalqalah': Color(0xFF0055FF),
+    'madd_normal': Color(0xFFD48B00),
+    'madd_permissible': Color(0xFFFF6600),
+    'madd_obligatory': Color(0xFFD50000),
+    'ham_wasl': Color(0xFF9E9E9E),
   };
 
-  /// تحويل النص المحتوي على وسوم التجويد (مثل [n[نص]) أو النص العادي إلى TextSpan ملون
   static List<TextSpan> parseTajweedText(String rawText, bool enableTajweed) {
     if (!enableTajweed) {
       final cleanText = rawText.replaceAllMapped(
@@ -286,7 +254,6 @@ class TajweedParser {
       return [TextSpan(text: cleanText)];
     }
 
-    // في حال كان النص يحتوي على ترميز مصحف التجويد الرسمي من API
     if (rawText.contains('[')) {
       final List<TextSpan> spans = [];
       final RegExp regex = RegExp(r'\[([a-zA-Z_]+)(?::\d+)?\[([^\]]+)\]');
@@ -316,7 +283,6 @@ class TajweedParser {
       return spans;
     }
 
-    // في حال كان النص برواية ورش الصافية بدون وسوم مسبقة، نطبق تلوين التجويد الذكي للحروف
     return _applyHeuristicTajweed(rawText);
   }
 
@@ -337,27 +303,16 @@ class TajweedParser {
       case 'p':
         return ruleColors['madd_permissible']!;
       case 'o':
-        return ruleColors['madd_obligatory']!;
       case 'm':
-        return ruleColors['madd_necessary']!;
-      case 'h':
-      case 's':
-      case 'l':
-        return ruleColors['ham_wasl']!;
-      case 'u':
-        return ruleColors['idgham_wo_ghunnah']!;
+        return ruleColors['madd_obligatory']!;
       default:
         return const Color(0xFF1F1F1F);
     }
   }
 
-  /// تلوين ذكي لأحكام القلقلة والغنة والمدود للنص القرآني المباشر (رواية ورش)
   static List<TextSpan> _applyHeuristicTajweed(String text) {
     final List<TextSpan> spans = [];
-    // تلوين حروف القلقلة الساكنة، النون والميم المشددتين، وعلامات المد
-    final RegExp ruleRegex = RegExp(
-      r'([قطبجد]ْ|[نم]ّ|[اوي]?ٓ|[ٱ])',
-    );
+    final RegExp ruleRegex = RegExp(r'([قطبجد]ْ|[نم]ّ|[اوي]?ٓ|[ٱ])');
 
     int lastIdx = 0;
     for (final match in ruleRegex.allMatches(text)) {
@@ -368,13 +323,13 @@ class TajweedParser {
       Color color = const Color(0xFF1F1F1F);
 
       if (token.contains('ْ')) {
-        color = ruleColors['qalqalah']!; // قلقلة
+        color = ruleColors['qalqalah']!;
       } else if (token.contains('ّ')) {
-        color = ruleColors['ghunnah']!; // غنة المشدد
+        color = ruleColors['ghunnah']!;
       } else if (token.contains('ٓ')) {
-        color = ruleColors['madd_obligatory']!; // مد مشبع في ورش
+        color = ruleColors['madd_obligatory']!;
       } else if (token == 'ٱ') {
-        color = ruleColors['ham_wasl']!; // همزة وصل
+        color = ruleColors['ham_wasl']!;
       }
 
       spans.add(TextSpan(text: token, style: TextStyle(color: color)));
@@ -388,9 +343,6 @@ class TajweedParser {
   }
 }
 
-// ==========================================
-// 4. الشاشة الرئيسية وإدارة الحالة الشاملة
-// ==========================================
 class MainHomeScreen extends StatefulWidget {
   const MainHomeScreen({super.key});
 
@@ -403,13 +355,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<SurahModel> _filteredSurahs = kAllSurahs;
 
-  // حالة القارئ والمصحف
   SurahModel _activeSurah = kAllSurahs[0];
-  bool _isWarshEdition = true; // true = رواية ورش، false = مصحف التجويد الملون المرمز
+  bool _isWarshEdition = true;
   bool _enableTajweedColors = true;
-  bool _isPageViewMode = false; // التبديل بين نظام الآيات ونظام الصفحات
+  bool _isPageViewMode = false;
 
-  // العلامة المرجعية
   BookmarkModel? _savedBookmark = BookmarkModel(
     surahNumber: 18,
     surahName: "الكهف",
@@ -417,7 +367,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     timestamp: DateTime.now(),
   );
 
-  // حالة المشغل الصوتي المدمج
   late final AudioPlayer _audioPlayer;
   ReciterModel _selectedReciter = kWarshReciters[0];
   SurahModel? _playingSurah;
@@ -425,9 +374,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
   bool _isAudioLoading = false;
-  String? _audioError;
 
-  // اشتراكات التدفقات (Streams) لإغلاقها بأمان
   StreamSubscription? _playerStateSub;
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
@@ -455,15 +402,11 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
 
     _positionSub = _audioPlayer.onPositionChanged.listen((pos) {
-      if (mounted) {
-        setState(() => _currentPosition = pos);
-      }
+      if (mounted) setState(() => _currentPosition = pos);
     });
 
     _durationSub = _audioPlayer.onDurationChanged.listen((dur) {
-      if (mounted) {
-        setState(() => _totalDuration = dur);
-      }
+      if (mounted) setState(() => _totalDuration = dur);
     });
 
     _completeSub = _audioPlayer.onPlayerComplete.listen((_) {
@@ -478,7 +421,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 
   @override
   void dispose() {
-    // إغلاق كافة المتحكمات والاشتراكات لمنع تسريب الذاكرة (Memory Leaks)
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _playerStateSub?.cancel();
@@ -496,9 +438,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         _filteredSurahs = kAllSurahs;
       } else {
         _filteredSurahs = kAllSurahs.where((surah) {
-          final matchesName = surah.name.contains(query);
-          final matchesNumber = surah.number.toString() == query;
-          return matchesName || matchesNumber;
+          return surah.name.contains(query) || surah.number.toString() == query;
         }).toList();
       }
     });
@@ -508,7 +448,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     setState(() {
       _playingSurah = surah;
       _isAudioLoading = true;
-      _audioError = null;
     });
 
     final String formattedNumber = surah.number.toString().padLeft(3, '0');
@@ -519,16 +458,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       await _audioPlayer.play(UrlSource(audioUrl));
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isAudioLoading = false;
-          _audioError = 'تعذر تشغيل الصوت. يرجى التحقق من اتصال الإنترنت.';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_audioError!),
-            backgroundColor: Colors.red.shade800,
-          ),
-        );
+        setState(() => _isAudioLoading = false);
       }
     }
   }
@@ -538,22 +468,17 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       await _playSurahAudio(_activeSurah);
       return;
     }
-
-    try {
-      if (_playerState == PlayerState.playing) {
-        await _audioPlayer.pause();
-      } else {
-        await _audioPlayer.resume();
-      }
-    } catch (_) {
-      await _playSurahAudio(_playingSurah!);
+    if (_playerState == PlayerState.playing) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.resume();
     }
   }
 
   void _openSurahReader(SurahModel surah, {int initialAyah = 1}) {
     setState(() {
       _activeSurah = surah;
-      _selectedTabIndex = 1; // الانتقال إلى تبويب المصحف
+      _selectedTabIndex = 1;
     });
   }
 
@@ -568,7 +493,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('تم حفظ العلامة المرجعية: سورة ${surah.name} - الآية $ayahNumber'),
+        content: Text('تم حفظ العلامة: سورة ${surah.name} - الآية $ayahNumber'),
         backgroundColor: const Color(0xFF0A4D3C),
         behavior: SnackBarBehavior.floating,
       ),
@@ -583,35 +508,16 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37)),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Text(
               _selectedTabIndex == 0
-                  ? 'المصحف الشريف (رواية ورش)'
+                  ? 'المصحف الشريف (ورش)'
                   : _selectedTabIndex == 1
                       ? 'سورة ${_activeSurah.name}'
-                      : 'السبحة الإلكترونية والأذكار',
+                      : 'السبحة الإلكترونية',
             ),
           ],
         ),
-        actions: [
-          if (_savedBookmark != null)
-            IconButton(
-              tooltip: 'الانتقال للعلامة المرجعية (سورة ${_savedBookmark!.surahName})',
-              icon: const Icon(Icons.bookmark_rounded, color: Color(0xFFD4AF37)),
-              onPressed: () {
-                final bookmarkedSurah = kAllSurahs.firstWhere(
-                  (s) => s.number == _savedBookmark!.surahNumber,
-                  orElse: () => kAllSurahs[0],
-                );
-                _openSurahReader(bookmarkedSurah, initialAyah: _savedBookmark!.ayahNumber);
-              },
-            ),
-          IconButton(
-            tooltip: 'مفتاح ألوان التجويد',
-            icon: const Icon(Icons.palette_outlined),
-            onPressed: _showTajweedLegendDialog,
-          ),
-        ],
       ),
       drawer: _buildIslamicDrawer(),
       body: Column(
@@ -640,7 +546,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               ],
             ),
           ),
-          // المشغل الصوتي المدمج في أسفل الشاشة
           _buildPersistentAudioPlayer(),
         ],
       ),
@@ -652,17 +557,14 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.format_list_numbered_rtl),
-            selectedIcon: Icon(Icons.format_list_numbered_rtl, color: Color(0xFF0A4D3C)),
             label: 'فهرس السور',
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_stories_outlined),
-            selectedIcon: Icon(Icons.auto_stories, color: Color(0xFF0A4D3C)),
+            icon: Icon(Icons.auto_stories),
             label: 'تصفح المصحف',
           ),
           NavigationDestination(
-            icon: Icon(Icons.Radio_button_checked),
-            selectedIcon: Icon(Icons.Radio_button_checked, color: Color(0xFF0A4D3C)),
+            icon: Icon(Icons.radio_button_checked),
             label: 'السبحة الرقمية',
           ),
         ],
@@ -670,496 +572,180 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     );
   }
 
-  // ==========================================
-  // 5. بناء فهرس السور وشريط البحث الفوري
-  // ==========================================
   Widget _buildSurahIndexTab() {
     return Column(
       children: [
-        // لافتة العلامة المرجعية السريعة
         if (_savedBookmark != null)
           Container(
-            margin: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0A4D3C), Color(0xFF126E56)],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
               ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.bookmark_added_rounded, color: Color(0xFFD4AF37), size: 30),
-                const SizedBox(width: 12),
+                const Icon(Icons.bookmark_added_rounded, color: Color(0xFFD4AF37), size: 28),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'آخر موضع قراءة محفوظ',
-                        style: TextStyle(color: Color(0xFFE6DEC8), fontSize: 12),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'سورة ${_savedBookmark!.surahName} - الآية ${_savedBookmark!.ayahNumber}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'آخر قراءة: سورة ${_savedBookmark!.surahName} (الآية ${_savedBookmark!.ayahNumber})',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
-                ElevatedButton.icon(
+                ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD4AF37),
                     foregroundColor: const Color(0xFF0A4D3C),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
-                  label: const Text('متابعة', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () {
-                    final surah = kAllSurahs.firstWhere(
-                      (s) => s.number == _savedBookmark!.surahNumber,
-                      orElse: () => kAllSurahs[0],
-                    );
+                    final surah = kAllSurahs.firstWhere((s) => s.number == _savedBookmark!.surahNumber);
                     _openSurahReader(surah, initialAyah: _savedBookmark!.ayahNumber);
                   },
+                  child: const Text('متابعة'),
                 ),
               ],
             ),
           ),
-
-        // حقل البحث الفوري باسم السورة أو رقمها
         Padding(
-          padding: const EdgeInsets.all(14.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'ابحث باسم السورة أو رقمها (مثال: الكهف أو 18)...',
+              hintText: 'ابحث باسم السورة أو رقمها...',
               prefixIcon: const Icon(Icons.search, color: Color(0xFF0A4D3C)),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => _searchController.clear(),
-                    )
-                  : null,
               filled: true,
               fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFD4AF37)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFE6DEC8), width: 1.5),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF0A4D3C), width: 2),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
           ),
         ),
-
-        // قائمة السور (114 سورة)
+        const SizedBox(height: 8),
         Expanded(
-          child: _filteredSurahs.isEmpty
-              ? const Center(
-                  child: Text(
-                    'لا توجد سورة مطابقة لبحثك',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  itemCount: _filteredSurahs.length,
-                  itemBuilder: (context, index) {
-                    final surah = _filteredSurahs[index];
-                    final isPlayingThis = _playingSurah?.number == surah.number &&
-                        _playerState == PlayerState.playing;
+          child: ListView.builder(
+            itemCount: _filteredSurahs.length,
+            itemBuilder: (context, index) {
+              final surah = _filteredSurahs[index];
+              final isPlayingThis = _playingSurah?.number == surah.number && _playerState == PlayerState.playing;
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        leading: Container(
-                          width: 44,
-                          height: 44,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0A4D3C).withOpacity(0.08),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-                          ),
-                          child: Text(
-                            '${surah.number}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0A4D3C),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          'سورة ${surah.name}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A4D3C),
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${surah.revelationType} • آياتها: ${surah.versesCount}',
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'تشغيل التلاوة برواية ورش',
-                              icon: Icon(
-                                isPlayingThis
-                                    ? Icons.pause_circle_filled_rounded
-                                    : Icons.play_circle_fill_rounded,
-                                color: const Color(0xFFD4AF37),
-                                size: 32,
-                              ),
-                              onPressed: () {
-                                if (isPlayingThis) {
-                                  _togglePlayPause();
-                                } else {
-                                  _playSurahAudio(surah);
-                                }
-                              },
-                            ),
-                            const Icon(Icons.chevron_right_rounded, color: Color(0xFF0A4D3C)),
-                          ],
-                        ),
-                        onTap: () => _openSurahReader(surah),
-                      ),
-                    );
-                  },
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF0A4D3C),
+                    foregroundColor: Colors.white,
+                    child: Text('${surah.number}'),
+                  ),
+                  title: Text('سورة ${surah.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${surah.revelationType} • ${surah.versesCount} آية'),
+                  trailing: IconButton(
+                    icon: Icon(
+                      isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                      color: const Color(0xFFD4AF37),
+                      size: 32,
+                    ),
+                    onPressed: () => isPlayingThis ? _togglePlayPause() : _playSurahAudio(surah),
+                  ),
+                  onTap: () => _openSurahReader(surah),
                 ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  // ==========================================
-  // 6. المشغل الصوتي المدمج (رواية ورش)
-  // ==========================================
   Widget _buildPersistentAudioPlayer() {
     final surahToDisplay = _playingSurah ?? _activeSurah;
-    final maxSeconds = _totalDuration.inSeconds > 0 ? _totalDuration.inSeconds.toDouble() : 1.0;
-    final currentSeconds = _currentPosition.inSeconds.toDouble().clamp(0.0, maxSeconds);
+    final maxSec = _totalDuration.inSeconds > 0 ? _totalDuration.inSeconds.toDouble() : 1.0;
+    final currentSec = _currentPosition.inSeconds.toDouble().clamp(0.0, maxSec);
 
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A4D3C),
-        border: const Border(top: BorderSide(color: Color(0xFFD4AF37), width: 2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      color: const Color(0xFF0A4D3C),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
         children: [
-          Row(
-            children: [
-              // زر التشغيل / الإيقاف المؤقت
-              if (_isAudioLoading)
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Color(0xFFD4AF37),
-                    ),
-                  ),
-                )
-              else
-                IconButton(
-                  icon: Icon(
-                    _playerState == PlayerState.playing
-                        ? Icons.pause_circle_filled_rounded
-                        : Icons.play_circle_filled_rounded,
-                    color: const Color(0xFFD4AF37),
-                    size: 38,
-                  ),
-                  onPressed: _togglePlayPause,
-                ),
-              const SizedBox(width: 8),
-              // معلومات السورة والقارئ
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'تلاوة سورة ${surahToDisplay.name}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      '${_selectedReciter.name} (رواية ورش)',
-                      style: const TextStyle(
-                        color: Color(0xFFE6DEC8),
-                        fontSize: 12,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+          if (_isAudioLoading)
+            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Color(0xFFD4AF37), strokeWidth: 2))
+          else
+            IconButton(
+              icon: Icon(
+                _playerState == PlayerState.playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                color: const Color(0xFFD4AF37),
+                size: 36,
               ),
-              // اختيار القارئ
-              PopupMenuButton<ReciterModel>(
-                tooltip: 'تغيير القارئ (رواية ورش)',
-                icon: const Icon(Icons.record_voice_over_rounded, color: Color(0xFFD4AF37)),
-                onSelected: (reciter) {
-                  setState(() => _selectedReciter = reciter);
-                  if (_playingSurah != null) {
-                    _playSurahAudio(_playingSurah!);
-                  }
-                },
-                itemBuilder: (context) => kWarshReciters
-                    .map(
-                      (r) => PopupMenuItem<ReciterModel>(
-                        value: r,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _selectedReciter.name == r.name
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: const Color(0xFF0A4D3C),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(r.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-          ),
-          // شريط التقدم الزمني
-          if (_playingSurah != null && _totalDuration.inSeconds > 0)
-            Row(
+              onPressed: _togglePlayPause,
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _formatDuration(_currentPosition),
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2.5,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                      activeTrackColor: const Color(0xFFD4AF37),
-                      inactiveTrackColor: Colors.white24,
-                      thumbColor: const Color(0xFFD4AF37),
-                    ),
-                    child: Slider(
-                      value: currentSeconds,
-                      max: maxSeconds,
-                      onChanged: (val) {
-                        _audioPlayer.seek(Duration(seconds: val.toInt()));
-                      },
-                    ),
-                  ),
-                ),
-                Text(
-                  _formatDuration(_totalDuration),
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
+                Text('تلاوة سورة ${surahToDisplay.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text('${_selectedReciter.name} (ورش)', style: const TextStyle(color: Color(0xFFE6DEC8), fontSize: 11)),
               ],
             ),
+          ),
+          PopupMenuButton<ReciterModel>(
+            icon: const Icon(Icons.record_voice_over, color: Color(0xFFD4AF37)),
+            onSelected: (reciter) {
+              setState(() => _selectedReciter = reciter);
+              if (_playingSurah != null) _playSurahAudio(_playingSurah!);
+            },
+            itemBuilder: (context) => kWarshReciters.map((r) => PopupMenuItem(value: r, child: Text(r.name))).toList(),
+          ),
         ],
       ),
     );
   }
 
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (d.inHours > 0) {
-      return '${d.inHours}:$minutes:$seconds';
-    }
-    return '$minutes:$seconds';
-  }
-
-  // ==========================================
-  // 7. القائمة الجانبية ودليل التجويد
-  // ==========================================
   Widget _buildIslamicDrawer() {
     return Drawer(
-      backgroundColor: const Color(0xFFFDFBF7),
       child: ListView(
-        padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0A4D3C), Color(0xFF063327)],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
+          const DrawerHeader(
+            decoration: BoxDecoration(color: Color(0xFF0A4D3C)),
+            child: Center(
+              child: Text(
+                'مصحف ورش والتجويد الملون',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFD4AF37), width: 2),
-                  ),
-                  child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37), size: 32),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'مصحف ورش والتجويد الملون',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text(
-                  'برواية ورش عن نافع من طريق الأزرق',
-                  style: TextStyle(color: Color(0xFFD4AF37), fontSize: 13),
-                ),
-              ],
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.format_list_numbered_rtl, color: Color(0xFF0A4D3C)),
-            title: const Text('فهرس السور الكامل'),
+            leading: const Icon(Icons.format_list_numbered_rtl),
+            title: const Text('فهرس السور'),
             onTap: () {
               Navigator.pop(context);
               setState(() => _selectedTabIndex = 0);
             },
           ),
           ListTile(
-            leading: const Icon(Icons.auto_stories, color: Color(0xFF0A4D3C)),
-            title: const Text('تصفح المصحف الشريف'),
+            leading: const Icon(Icons.auto_stories),
+            title: const Text('تصفح المصحف'),
             onTap: () {
               Navigator.pop(context);
               setState(() => _selectedTabIndex = 1);
             },
           ),
           ListTile(
-            leading: const Icon(Icons.Radio_button_checked, color: Color(0xFF0A4D3C)),
-            title: const Text('السبحة الإلكترونية'),
+            leading: const Icon(Icons.radio_button_checked),
+            title: const Text('السبحة الرقمية'),
             onTap: () {
               Navigator.pop(context);
               setState(() => _selectedTabIndex = 2);
             },
           ),
-          const Divider(),
           SwitchListTile(
-            activeColor: const Color(0xFF0A4D3C),
-            title: const Text('تلوين أحكام التجويد'),
-            subtitle: const Text('إظهار الألوان الإرشادية للأحكام'),
+            title: const Text('ألوان التجويد'),
             value: _enableTajweedColors,
             onChanged: (val) {
               setState(() => _enableTajweedColors = val);
               Navigator.pop(context);
             },
-          ),
-          ListTile(
-            leading: const Icon(Icons.palette_outlined, color: Color(0xFFD4AF37)),
-            title: const Text('دليل ألوان أحكام التجويد'),
-            onTap: () {
-              Navigator.pop(context);
-              _showTajweedLegendDialog();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTajweedLegendDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFFDFBF7),
-        title: const Row(
-          children: [
-            Icon(Icons.palette, color: Color(0xFF0A4D3C)),
-            SizedBox(width: 8),
-            Text(
-              'مفتاح ألوان التجويد',
-              style: TextStyle(color: Color(0xFF0A4D3C), fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _legendItem(const Color(0xFFD50000), 'المد اللازم والواجب والمشبع (ورش)'),
-            _legendItem(const Color(0xFFD48B00), 'المد الطبيعي والمد الجائز'),
-            _legendItem(const Color(0xFF169777), 'الغنة، الإخفاء، والإدغام بغنة'),
-            _legendItem(const Color(0xFF0055FF), 'القلقلة (قطب جد)'),
-            _legendItem(const Color(0xFF26BFFD), 'الإقلاب'),
-            _legendItem(const Color(0xFF9E9E9E), 'حروف لا تنطق (همزة الوصل واللام الشمسية)'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق', style: TextStyle(color: Color(0xFF0A4D3C))),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _legendItem(Color color, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),
@@ -1167,9 +753,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 }
 
-// ==========================================
-// 8. شاشة قارئ المصحف الشريف (ورش / التجويد الملون)
-// ==========================================
 class SurahReaderView extends StatefulWidget {
   final SurahModel surah;
   final bool isWarshEdition;
@@ -1206,10 +789,7 @@ class _SurahReaderViewState extends State<SurahReaderView> {
   bool _isLoading = true;
   String? _errorMessage;
   List<AyahModel> _ayahs = [];
-  double _fontSize = 24.0;
-
-  // تخزين مؤقت في الذاكرة لتسريع التصفح وعدم إعادة التحميل عند التبديل
-  final Map<String, List<AyahModel>> _memoryCache = {};
+  double _fontSize = 22.0;
 
   @override
   void initState() {
@@ -1220,66 +800,43 @@ class _SurahReaderViewState extends State<SurahReaderView> {
   @override
   void didUpdateWidget(covariant SurahReaderView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.surah.number != widget.surah.number ||
-        oldWidget.isWarshEdition != widget.isWarshEdition) {
+    if (oldWidget.surah.number != widget.surah.number || oldWidget.isWarshEdition != widget.isWarshEdition) {
       _fetchSurahData();
     }
   }
 
   Future<void> _fetchSurahData() async {
     final String edition = widget.isWarshEdition ? 'quran-warsh' : 'quran-tajweed';
-    final String cacheKey = '${widget.surah.number}_$edition';
-
-    if (_memoryCache.containsKey(cacheKey)) {
-      setState(() {
-        _ayahs = _memoryCache[cacheKey]!;
-        _isLoading = false;
-        _errorMessage = null;
-      });
-      return;
-    }
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final Uri url = Uri.parse(
-        'https://api.alquran.cloud/v1/surah/${widget.surah.number}/$edition',
-      );
+      final Uri url = Uri.parse('https://api.alquran.cloud/v1/surah/${widget.surah.number}/$edition');
       final response = await http.get(url).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> decoded = json.decode(response.body);
         final List<dynamic> rawAyahs = decoded['data']['ayahs'];
 
-        final List<AyahModel> parsedAyahs = rawAyahs.map((item) {
-          return AyahModel(
+        setState(() {
+          _ayahs = rawAyahs.map((item) => AyahModel(
             numberInSurah: item['numberInSurah'] ?? 1,
             text: item['text'] ?? '',
             page: item['page'] ?? 1,
             juz: item['juz'] ?? 1,
-          );
-        }).toList();
-
-        _memoryCache[cacheKey] = parsedAyahs;
-
-        if (mounted) {
-          setState(() {
-            _ayahs = parsedAyahs;
-            _isLoading = false;
-          });
-        }
+          )).toList();
+          _isLoading = false;
+        });
       } else {
-        throw Exception('Server status: ${response.statusCode}');
+        throw Exception();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage =
-              'تعذر تحميل آيات السورة بسبب ضعف الاتصال بالإنترنت.\nيرجى التحقق من الشبكة والمحاولة مجدداً.';
+          _errorMessage = 'تعذر تحميل الآيات. يرجى التحقق من اتصال الإنترنت.';
         });
       }
     }
@@ -1289,374 +846,92 @@ class _SurahReaderViewState extends State<SurahReaderView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // شريط أدوات القراءة والتحكم بالرواية والخط
-        _buildReaderToolbar(),
-
-        // محتوى الآيات أو الصفحات
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          color: const Color(0xFFF6F1E3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ChoiceChip(
+                label: const Text('ورش'),
+                selected: widget.isWarshEdition,
+                onSelected: (_) => widget.onToggleEdition(true),
+              ),
+              ChoiceChip(
+                label: const Text('التجويد الملون'),
+                selected: !widget.isWarshEdition,
+                onSelected: (_) => widget.onToggleEdition(false),
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove),
+                    onPressed: () { if (_fontSize > 16) setState(() => _fontSize -= 2); },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () { if (_fontSize < 36) setState(() => _fontSize += 2); },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: _isLoading
-              ? const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: Color(0xFF0A4D3C)),
-                      SizedBox(height: 16),
-                      Text(
-                        'جاري تحميل آيات المصحف الشريف...',
-                        style: TextStyle(
-                          color: Color(0xFF0A4D3C),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF0A4D3C)))
               : _errorMessage != null
-                  ? _buildErrorWidget()
-                  : widget.isPageViewMode
-                      ? _buildMushafPageView()
-                      : _buildAyahListView(),
+                  ? Center(child: Text(_errorMessage!))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _ayahs.length,
+                      itemBuilder: (context, index) {
+                        final ayah = _ayahs[index];
+                        final isBookmarked = widget.bookmarkedAyah == ayah.numberInSurah;
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          color: isBookmarked ? const Color(0xFFFFF9E6) : Colors.white,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('الآية ${ayah.numberInSurah} (صفحة ${ayah.page})', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                    IconButton(
+                                      icon: Icon(isBookmarked ? Icons.bookmark : Icons.bookmark_border, color: const Color(0xFFD4AF37)),
+                                      onPressed: () => widget.onBookmarkAyah(ayah.numberInSurah),
+                                    ),
+                                  ],
+                                ),
+                                RichText(
+                                  textAlign: TextAlign.right,
+                                  text: TextSpan(
+                                    style: TextStyle(fontSize: _fontSize, height: 1.9, color: Colors.black87),
+                                    children: [
+                                      ...TajweedParser.parseTajweedText(ayah.text, widget.enableTajweedColors),
+                                      TextSpan(
+                                        text: ' ﴿${ayah.numberInSurah}﴾',
+                                        style: TextStyle(color: const Color(0xFF0A4D3C), fontSize: _fontSize * 0.8),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
         ),
       ],
     );
   }
-
-  Widget _buildReaderToolbar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6F1E3),
-        border: Border(bottom: BorderSide(color: Color(0xFFE6DEC8))),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          // التبديل بين رواية ورش ومصحف التجويد
-          ChoiceChip(
-            label: const Text('رواية ورش'),
-            selected: widget.isWarshEdition,
-            selectedColor: const Color(0xFF0A4D3C),
-            labelStyle: TextStyle(
-              color: widget.isWarshEdition ? Colors.white : const Color(0xFF0A4D3C),
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            onSelected: (_) => widget.onToggleEdition(true),
-          ),
-          ChoiceChip(
-            label: const Text('مصحف التجويد الملون'),
-            selected: !widget.isWarshEdition,
-            selectedColor: const Color(0xFF0A4D3C),
-            labelStyle: TextStyle(
-              color: !widget.isWarshEdition ? Colors.white : const Color(0xFF0A4D3C),
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            onSelected: (_) => widget.onToggleEdition(false),
-          ),
-          // أزرار تكبير وتصغير الخط وطريقة العرض
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: widget.isPageViewMode ? 'عرض كقائمة آيات' : 'عرض كصفحة مصحف متصلة',
-                icon: Icon(
-                  widget.isPageViewMode ? Icons.view_agenda_outlined : Icons.menu_book_outlined,
-                  color: const Color(0xFF0A4D3C),
-                ),
-                onPressed: () => widget.onToggleViewMode(!widget.isPageViewMode),
-              ),
-              IconButton(
-                tooltip: 'تصغير الخط',
-                icon: const Icon(Icons.text_decrease, color: Color(0xFF0A4D3C)),
-                onPressed: () {
-                  if (_fontSize > 18) setState(() => _fontSize -= 2);
-                },
-              ),
-              IconButton(
-                tooltip: 'تكبير الخط',
-                icon: const Icon(Icons.text_increase, color: Color(0xFF0A4D3C)),
-                onPressed: () {
-                  if (_fontSize < 38) setState(() => _fontSize += 2);
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, size: 60, color: Color(0xFFD4AF37)),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, height: 1.5),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A4D3C),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-              onPressed: _fetchSurahData,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // عرض المصحف بنظام الصفحات المتصلة (كالمصحف الورقي)
-  Widget _buildMushafPageView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFDF9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFD4AF37), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            _buildSurahHeaderBanner(),
-            const SizedBox(height: 16),
-            RichText(
-              textAlign: TextAlign.justify,
-              textDirection: TextDirection.rtl,
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: _fontSize,
-                  height: 2.1,
-                  color: const Color(0xFF1F1F1F),
-                  fontFamily: 'serif',
-                ),
-                children: _ayahs.expand((ayah) {
-                  final spans = TajweedParser.parseTajweedText(
-                    ayah.text,
-                    widget.enableTajweedColors,
-                  );
-                  return [
-                    ...spans,
-                    TextSpan(
-                      text: ' ﴿${ayah.numberInSurah}﴾ ',
-                      style: TextStyle(
-                        color: const Color(0xFFD4AF37),
-                        fontWeight: FontWeight.bold,
-                        fontSize: _fontSize * 0.8,
-                      ),
-                    ),
-                  ];
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildSurahNavigationFooter(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // عرض المصحف بنظام الآيات المفصلة مع خيارات الحفظ المرجعي لكل آية
-  Widget _buildAyahListView() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(14),
-      itemCount: _ayahs.length + 2,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _buildSurahHeaderBanner();
-        }
-        if (index == _ayahs.length + 1) {
-          return _buildSurahNavigationFooter();
-        }
-
-        final ayah = _ayahs[index - 1];
-        final isBookmarked = widget.bookmarkedAyah == ayah.numberInSurah;
-
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          color: isBookmarked ? const Color(0xFFFFF9E6) : Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A4D3C).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'الآية ${ayah.numberInSurah} • صفحة ${ayah.page} • جزء ${ayah.juz}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF0A4D3C),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'حفظ علامة مرجعية عند هذه الآية',
-                      icon: Icon(
-                        isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                        color: const Color(0xFFD4AF37),
-                      ),
-                      onPressed: () => widget.onBookmarkAyah(ayah.numberInSurah),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                RichText(
-                  textAlign: TextAlign.right,
-                  textDirection: TextDirection.rtl,
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontSize: _fontSize,
-                      height: 1.95,
-                      color: const Color(0xFF1F1F1F),
-                    ),
-                    children: [
-                      ...TajweedParser.parseTajweedText(ayah.text, widget.enableTajweedColors),
-                      TextSpan(
-                        text: ' ﴿${ayah.numberInSurah}﴾',
-                        style: TextStyle(
-                          color: const Color(0xFF0A4D3C),
-                          fontWeight: FontWeight.bold,
-                          fontSize: _fontSize * 0.85,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSurahHeaderBanner() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0A4D3C), Color(0xFF126E56)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${widget.surah.revelationType} • ${widget.surah.versesCount} آية',
-                style: const TextStyle(color: Color(0xFFE6DEC8), fontSize: 13),
-              ),
-              Text(
-                'سورة ${widget.surah.name}',
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: const Color(0xFF0A4D3C),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                ),
-                icon: const Icon(Icons.volume_up_rounded, size: 18),
-                label: const Text('استماع', style: TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: widget.onPlaySurah,
-              ),
-            ],
-          ),
-          if (widget.surah.number != 1 && widget.surah.number != 9) ...[
-            const Divider(color: Colors.white24, height: 24),
-            const Text(
-              'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSurahNavigationFooter() {
-    final hasPrev = widget.surah.number > 1;
-    final hasNext = widget.surah.number < 114;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (hasPrev)
-            OutlinedButton.icon(
-              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-              label: Text('سورة ${kAllSurahs[widget.surah.number - 2].name}'),
-              onPressed: () => widget.onChangeSurah(kAllSurahs[widget.surah.number - 2]),
-            )
-          else
-            const SizedBox.shrink(),
-          if (hasNext)
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A4D3C),
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
-              label: Text('سورة ${kAllSurahs[widget.surah.number].name}'),
-              onPressed: () => widget.onChangeSurah(kAllSurahs[widget.surah.number]),
-            )
-          else
-            const SizedBox.shrink(),
-        ],
-      ),
-    );
-  }
 }
 
-// ==========================================
-// 9. السبحة الإلكترونية الرقمية
-// ==========================================
 class TasbihScreenView extends StatefulWidget {
   const TasbihScreenView({super.key});
 
@@ -1667,204 +942,39 @@ class TasbihScreenView extends StatefulWidget {
 class _TasbihScreenViewState extends State<TasbihScreenView> {
   int _counter = 0;
   int _totalCounter = 0;
-  int _target = 33;
-  int _selectedDhikrIndex = 0;
-
-  final List<String> _adhkarList = const [
-    'سُبْحَانَ اللَّهِ',
-    'الْحَمْدُ لِلَّهِ',
-    'اللَّهُ أَكْبَرُ',
-    'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ',
-    'أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ',
-    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ',
-  ];
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-      _totalCounter++;
-      if (_counter > _target) {
-        _counter = 1;
-        _selectedDhikrIndex = (_selectedDhikrIndex + 1) % _adhkarList.length;
-      }
-    });
-  }
-
-  void _resetCounter() {
-    setState(() {
-      _counter = 0;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // اختيار الذكر
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A4D3C),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFD4AF37), width: 2),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'الذكر الحالي',
-                  style: TextStyle(color: Color(0xFFD4AF37), fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _adhkarList[_selectedDhikrIndex],
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  children: [33, 100, 1000].map((targetVal) {
-                    final isSelected = _target == targetVal;
-                    return ChoiceChip(
-                      label: Text('الهدف: $targetVal'),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFFD4AF37),
-                      labelStyle: TextStyle(
-                        color: isSelected ? const Color(0xFF0A4D3C) : Colors.black87,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (_) => setState(() {
-                        _target = targetVal;
-                        _counter = 0;
-                      }),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 30),
-
-          // زر السبحة الدائري الكبير
+          const Text('سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A4D3C))),
+          const SizedBox(height: 25),
           GestureDetector(
-            onTap: _incrementCounter,
+            onTap: () {
+              setState(() {
+                _counter++;
+                _totalCounter++;
+              });
+            },
             child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
+              width: 180,
+              height: 180,
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const RadialGradient(
-                  colors: [Color(0xFF126E56), Color(0xFF0A4D3C)],
-                ),
-                border: Border.all(color: const Color(0xFFD4AF37), width: 5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0A4D3C).withOpacity(0.35),
-                    blurRadius: 20,
-                    spreadRadius: 4,
-                  ),
-                ],
+                color: Color(0xFF0A4D3C),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '$_counter',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 56,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'من $_target',
-                    style: const TextStyle(
-                      color: Color(0xFFD4AF37),
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'اضغط للتسبيح',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
-              ),
+              alignment: Alignment.center,
+              child: Text('$_counter', style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold)),
             ),
-          ),
-          const SizedBox(height: 28),
-
-          // إحصائيات التسابيح وزر التصفير
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Column(
-                    children: [
-                      const Text('مجموع التسابيح', style: TextStyle(color: Colors.grey)),
-                      Text(
-                        '$_totalCounter',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4D3C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: const Color(0xFF0A4D3C),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                ),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('تصفير العداد', style: TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: _resetCounter,
-              ),
-            ],
           ),
           const SizedBox(height: 20),
-
-          // قائمة الأذكار السريعة للتبديل
-          SizedBox(
-            height: 45,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _adhkarList.length,
-              itemBuilder: (context, idx) {
-                final isSelected = idx == _selectedDhikrIndex;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: ActionChip(
-                    backgroundColor: isSelected ? const Color(0xFF0A4D3C) : Colors.white,
-                    label: Text(
-                      _adhkarList[idx],
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : const Color(0xFF0A4D3C),
-                      ),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _selectedDhikrIndex = idx;
-                        _counter = 0;
-                      });
-                    },
-                  ),
-                );
-              },
-            ),
+          Text('المجموع الكلي: $_totalCounter', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: () => setState(() => _counter = 0),
+            child: const Text('إعادة ضبط العداد'),
           ),
         ],
       ),
