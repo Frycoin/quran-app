@@ -26,10 +26,12 @@ jobs:
 
       - name: Setup Project Structure
         run: |
-          cp -r lib /tmp/user_lib
-          flutter create --platforms=android --org com.app.quran .
+          mkdir -p /tmp/saved_lib
+          cp -r lib/* /tmp/saved_lib/
+          flutter create --project-name quran_app --platforms=android --org com.app.quran .
           rm -rf lib
-          cp -r /tmp/user_lib lib
+          mkdir -p lib
+          cp -r /tmp/saved_lib/* lib/
           flutter pub add http audioplayers
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
 
