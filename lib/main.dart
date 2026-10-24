@@ -1,983 +1,1576 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const QuranWarshTajweedApp());
+  runApp(const HollowKnightMetroidvaniaApp());
 }
 
-class QuranWarshTajweedApp extends StatelessWidget {
-  const QuranWarshTajweedApp({super.key});
+// ==========================================
+// 1. التطبيق الرئيسي
+// ==========================================
+class HollowKnightMetroidvaniaApp extends StatelessWidget {
+  const HollowKnightMetroidvaniaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'مصحف ورش والتجويد الملون',
+      title: 'Hallownest Echoes',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFDFBF7),
-        primaryColor: const Color(0xFF0A4D3C),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0A4D3C),
-          primary: const Color(0xFF0A4D3C),
-          secondary: const Color(0xFFD4AF37),
-          surface: const Color(0xFFFDFBF7),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0A4D3C),
-          foregroundColor: Colors.white,
-          centerTitle: true,
-          elevation: 2,
-        ),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF05070B),
       ),
-      builder: (context, child) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-      home: const MainHomeScreen(),
+      home: const GameScreen(),
     );
   }
 }
 
-class SurahModel {
-  final int number;
-  final String name;
-  final String revelationType;
-  final int versesCount;
+// ==========================================
+// 2. هياكل البيانات والكائنات الفيزيائية
+// ==========================================
+enum SlashDir { left, right, up, down }
+enum EnemyType { crawler, flyinghusks, falseGuardBoss }
 
-  const SurahModel({
-    required this.number,
-    required this.name,
-    required this.revelationType,
-    required this.versesCount,
+class PlatformRect {
+  final Rect rect;
+  final bool isHazard;
+  const PlatformRect(this.rect, {this.isHazard = false});
+}
+
+class GhostAfterImage {
+  Offset pos;
+  int facing;
+  double alpha;
+  bool isShadeDash;
+
+  GhostAfterImage({
+    required this.pos,
+    required this.facing,
+    this.alpha = 0.75,
+    this.isShadeDash = false,
   });
 }
 
-class AyahModel {
-  final int numberInSurah;
-  final String text;
-  final int page;
-  final int juz;
+class GameParticle {
+  Offset pos;
+  Offset vel;
+  Color color;
+  double size;
+  double life;
+  double maxLife;
+  bool gravityAffected;
 
-  AyahModel({
-    required this.numberInSurah,
-    required this.text,
-    required this.page,
-    required this.juz,
+  GameParticle({
+    required this.pos,
+    required this.vel,
+    required this.color,
+    required this.size,
+    required this.life,
+    this.gravityAffected = true,
+  }) : maxLife = life;
+}
+
+class AmbientSpore {
+  Offset pos;
+  double radius;
+  double speedY;
+  double phase;
+  Color color;
+
+  AmbientSpore({
+    required this.pos,
+    required this.radius,
+    required this.speedY,
+    required this.phase,
+    required this.color,
   });
 }
 
-class BookmarkModel {
-  final int surahNumber;
-  final String surahName;
-  final int ayahNumber;
-  final DateTime timestamp;
+class SoulSpellProjectile {
+  Offset pos;
+  Offset vel;
+  double radius;
+  double life;
+  Set<int> hitEnemyIds = {};
 
-  BookmarkModel({
-    required this.surahNumber,
-    required this.surahName,
-    required this.ayahNumber,
-    required this.timestamp,
+  SoulSpellProjectile({
+    required this.pos,
+    required this.vel,
+    this.radius = 22.0,
+    this.life = 1.6,
   });
 }
 
-class ReciterModel {
-  final String name;
-  final String serverUrl;
-  final String description;
+class EnemyEntity {
+  final int id;
+  final EnemyType type;
+  Offset pos;
+  Offset vel;
+  Size size;
+  int hp;
+  int maxHp;
+  double patrolMinX;
+  double patrolMaxX;
+  int facing;
+  double flashTimer = 0.0;
+  double aiTimer = 0.0;
+  int bossState = 0;
+  bool onGround = false;
 
-  const ReciterModel({
-    required this.name,
-    required this.serverUrl,
-    required this.description,
+  EnemyEntity({
+    required this.id,
+    required this.type,
+    required this.pos,
+    required this.size,
+    required this.hp,
+    required this.patrolMinX,
+    required this.patrolMaxX,
+    this.facing = -1,
+  })  : maxHp = hp,
+        vel = Offset.zero;
+
+  Rect get bounds => Rect.fromCenter(center: pos, width: size.width, height: size.height);
+}
+
+class ShockwaveHazard {
+  Offset pos;
+  double vx;
+  double width;
+  double height;
+  double life;
+
+  ShockwaveHazard({
+    required this.pos,
+    required this.vx,
+    this.width = 28,
+    this.height = 46,
+    this.life = 1.8,
   });
+
+  Rect get bounds => Rect.fromLTWH(pos.dx - width / 2, pos.dy - height, width, height);
 }
 
-const List<ReciterModel> kWarshReciters = [
-  ReciterModel(
-    name: 'القارئ ياسين الجزائري',
-    serverUrl: 'https://server11.mp3quran.net/qari/',
-    description: 'رواية ورش عن نافع من طريق الأزرق',
-  ),
-  ReciterModel(
-    name: 'الشيخ العيون الكوشي',
-    serverUrl: 'https://server11.mp3quran.net/koshi/',
-    description: 'رواية ورش عن نافع',
-  ),
-  ReciterModel(
-    name: 'الشيخ عمر القزابري',
-    serverUrl: 'https://server9.mp3quran.net/omar_warsh/',
-    description: 'رواية ورش عن نافع',
-  ),
-];
-
-const List<SurahModel> kAllSurahs = [
-  SurahModel(number: 1, name: "الفاتحة", revelationType: "مكية", versesCount: 7),
-  SurahModel(number: 2, name: "البقرة", revelationType: "مدنية", versesCount: 286),
-  SurahModel(number: 3, name: "آل عمران", revelationType: "مدنية", versesCount: 200),
-  SurahModel(number: 4, name: "النساء", revelationType: "مدنية", versesCount: 176),
-  SurahModel(number: 5, name: "المائدة", revelationType: "مدنية", versesCount: 120),
-  SurahModel(number: 6, name: "الأنعام", revelationType: "مكية", versesCount: 165),
-  SurahModel(number: 7, name: "الأعراف", revelationType: "مكية", versesCount: 206),
-  SurahModel(number: 8, name: "الأنفال", revelationType: "مدنية", versesCount: 75),
-  SurahModel(number: 9, name: "التوبة", revelationType: "مدنية", versesCount: 129),
-  SurahModel(number: 10, name: "يونس", revelationType: "مكية", versesCount: 109),
-  SurahModel(number: 11, name: "هود", revelationType: "مكية", versesCount: 123),
-  SurahModel(number: 12, name: "يوسف", revelationType: "مكية", versesCount: 111),
-  SurahModel(number: 13, name: "الرعد", revelationType: "مدنية", versesCount: 43),
-  SurahModel(number: 14, name: "إبراهيم", revelationType: "مكية", versesCount: 52),
-  SurahModel(number: 15, name: "الحجر", revelationType: "مكية", versesCount: 99),
-  SurahModel(number: 16, name: "النحل", revelationType: "مكية", versesCount: 128),
-  SurahModel(number: 17, name: "الإسراء", revelationType: "مكية", versesCount: 111),
-  SurahModel(number: 18, name: "الكهف", revelationType: "مكية", versesCount: 110),
-  SurahModel(number: 19, name: "مريم", revelationType: "مكية", versesCount: 98),
-  SurahModel(number: 20, name: "طه", revelationType: "مكية", versesCount: 135),
-  SurahModel(number: 21, name: "الأنبياء", revelationType: "مكية", versesCount: 112),
-  SurahModel(number: 22, name: "الحج", revelationType: "مدنية", versesCount: 78),
-  SurahModel(number: 23, name: "المؤمنون", revelationType: "مكية", versesCount: 118),
-  SurahModel(number: 24, name: "النور", revelationType: "مدنية", versesCount: 64),
-  SurahModel(number: 25, name: "الفرقان", revelationType: "مكية", versesCount: 77),
-  SurahModel(number: 26, name: "الشعراء", revelationType: "مكية", versesCount: 227),
-  SurahModel(number: 27, name: "النمل", revelationType: "مكية", versesCount: 93),
-  SurahModel(number: 28, name: "القصص", revelationType: "مكية", versesCount: 88),
-  SurahModel(number: 29, name: "العنكبوت", revelationType: "مكية", versesCount: 69),
-  SurahModel(number: 30, name: "الروم", revelationType: "مكية", versesCount: 60),
-  SurahModel(number: 31, name: "لقمان", revelationType: "مكية", versesCount: 34),
-  SurahModel(number: 32, name: "السجدة", revelationType: "مكية", versesCount: 30),
-  SurahModel(number: 33, name: "الأحزاب", revelationType: "مدنية", versesCount: 73),
-  SurahModel(number: 34, name: "سبأ", revelationType: "مكية", versesCount: 54),
-  SurahModel(number: 35, name: "فاطر", revelationType: "مكية", versesCount: 45),
-  SurahModel(number: 36, name: "يس", revelationType: "مكية", versesCount: 83),
-  SurahModel(number: 37, name: "الصافات", revelationType: "مكية", versesCount: 182),
-  SurahModel(number: 38, name: "ص", revelationType: "مكية", versesCount: 88),
-  SurahModel(number: 39, name: "الزمر", revelationType: "مكية", versesCount: 75),
-  SurahModel(number: 40, name: "غافر", revelationType: "مكية", versesCount: 85),
-  SurahModel(number: 41, name: "فصلت", revelationType: "مكية", versesCount: 54),
-  SurahModel(number: 42, name: "الشورى", revelationType: "مكية", versesCount: 53),
-  SurahModel(number: 43, name: "الزخرف", revelationType: "مكية", versesCount: 89),
-  SurahModel(number: 44, name: "الدخان", revelationType: "مكية", versesCount: 59),
-  SurahModel(number: 45, name: "الجاثية", revelationType: "مكية", versesCount: 37),
-  SurahModel(number: 46, name: "الأحقاف", revelationType: "مكية", versesCount: 35),
-  SurahModel(number: 47, name: "محمد", revelationType: "مدنية", versesCount: 38),
-  SurahModel(number: 48, name: "الفتح", revelationType: "مدنية", versesCount: 29),
-  SurahModel(number: 49, name: "الحجرات", revelationType: "مدنية", versesCount: 18),
-  SurahModel(number: 50, name: "ق", revelationType: "مكية", versesCount: 45),
-  SurahModel(number: 51, name: "الذاريات", revelationType: "مكية", versesCount: 60),
-  SurahModel(number: 52, name: "الطور", revelationType: "مكية", versesCount: 49),
-  SurahModel(number: 53, name: "النجم", revelationType: "مكية", versesCount: 62),
-  SurahModel(number: 54, name: "القمر", revelationType: "مكية", versesCount: 55),
-  SurahModel(number: 55, name: "الرحمن", revelationType: "مدنية", versesCount: 78),
-  SurahModel(number: 56, name: "الواقعة", revelationType: "مكية", versesCount: 96),
-  SurahModel(number: 57, name: "الحديد", revelationType: "مدنية", versesCount: 29),
-  SurahModel(number: 58, name: "المجادلة", revelationType: "مدنية", versesCount: 22),
-  SurahModel(number: 59, name: "الحشر", revelationType: "مدنية", versesCount: 24),
-  SurahModel(number: 60, name: "الممتحنة", revelationType: "مدنية", versesCount: 13),
-  SurahModel(number: 61, name: "الصف", revelationType: "مدنية", versesCount: 14),
-  SurahModel(number: 62, name: "الجمعة", revelationType: "مدنية", versesCount: 11),
-  SurahModel(number: 63, name: "المنافقون", revelationType: "مدنية", versesCount: 11),
-  SurahModel(number: 64, name: "التغابن", revelationType: "مدنية", versesCount: 18),
-  SurahModel(number: 65, name: "الطلاق", revelationType: "مدنية", versesCount: 12),
-  SurahModel(number: 66, name: "التحريم", revelationType: "مدنية", versesCount: 12),
-  SurahModel(number: 67, name: "الملك", revelationType: "مكية", versesCount: 30),
-  SurahModel(number: 68, name: "القلم", revelationType: "مكية", versesCount: 52),
-  SurahModel(number: 69, name: "الحاقة", revelationType: "مكية", versesCount: 52),
-  SurahModel(number: 70, name: "المعارج", revelationType: "مكية", versesCount: 44),
-  SurahModel(number: 71, name: "نوح", revelationType: "مكية", versesCount: 28),
-  SurahModel(number: 72, name: "الجن", revelationType: "مكية", versesCount: 28),
-  SurahModel(number: 73, name: "المزمل", revelationType: "مكية", versesCount: 20),
-  SurahModel(number: 74, name: "المدثر", revelationType: "مكية", versesCount: 56),
-  SurahModel(number: 75, name: "القيامة", revelationType: "مكية", versesCount: 40),
-  SurahModel(number: 76, name: "الإنسان", revelationType: "مدنية", versesCount: 31),
-  SurahModel(number: 77, name: "المرسلات", revelationType: "مكية", versesCount: 50),
-  SurahModel(number: 78, name: "النبأ", revelationType: "مكية", versesCount: 40),
-  SurahModel(number: 79, name: "النازعات", revelationType: "مكية", versesCount: 46),
-  SurahModel(number: 80, name: "عبس", revelationType: "مكية", versesCount: 42),
-  SurahModel(number: 81, name: "التكوير", revelationType: "مكية", versesCount: 29),
-  SurahModel(number: 82, name: "الانفطار", revelationType: "مكية", versesCount: 19),
-  SurahModel(number: 83, name: "المطففين", revelationType: "مكية", versesCount: 36),
-  SurahModel(number: 84, name: "الانشقاق", revelationType: "مكية", versesCount: 25),
-  SurahModel(number: 85, name: "البروج", revelationType: "مكية", versesCount: 22),
-  SurahModel(number: 86, name: "الطارق", revelationType: "مكية", versesCount: 17),
-  SurahModel(number: 87, name: "الأعلى", revelationType: "مكية", versesCount: 19),
-  SurahModel(number: 88, name: "الغاشية", revelationType: "مكية", versesCount: 26),
-  SurahModel(number: 89, name: "الفجر", revelationType: "مكية", versesCount: 30),
-  SurahModel(number: 90, name: "البلد", revelationType: "مكية", versesCount: 20),
-  SurahModel(number: 91, name: "الشمس", revelationType: "مكية", versesCount: 15),
-  SurahModel(number: 92, name: "الليل", revelationType: "مكية", versesCount: 21),
-  SurahModel(number: 93, name: "الضحى", revelationType: "مكية", versesCount: 11),
-  SurahModel(number: 94, name: "الشرح", revelationType: "مكية", versesCount: 8),
-  SurahModel(number: 95, name: "التين", revelationType: "مكية", versesCount: 8),
-  SurahModel(number: 96, name: "العلق", revelationType: "مكية", versesCount: 19),
-  SurahModel(number: 97, name: "القدر", revelationType: "مكية", versesCount: 5),
-  SurahModel(number: 98, name: "البينة", revelationType: "مدنية", versesCount: 8),
-  SurahModel(number: 99, name: "الزلزلة", revelationType: "مدنية", versesCount: 8),
-  SurahModel(number: 100, name: "العاديات", revelationType: "مكية", versesCount: 11),
-  SurahModel(number: 101, name: "القارعة", revelationType: "مكية", versesCount: 11),
-  SurahModel(number: 102, name: "التكاثر", revelationType: "مكية", versesCount: 8),
-  SurahModel(number: 103, name: "العصر", revelationType: "مكية", versesCount: 3),
-  SurahModel(number: 104, name: "الهمزة", revelationType: "مكية", versesCount: 9),
-  SurahModel(number: 105, name: "الفيل", revelationType: "مكية", versesCount: 5),
-  SurahModel(number: 106, name: "قريش", revelationType: "مكية", versesCount: 4),
-  SurahModel(number: 107, name: "الماعون", revelationType: "مكية", versesCount: 7),
-  SurahModel(number: 108, name: "الكوثر", revelationType: "مكية", versesCount: 3),
-  SurahModel(number: 109, name: "الكافرون", revelationType: "مكية", versesCount: 6),
-  SurahModel(number: 110, name: "النصر", revelationType: "مدنية", versesCount: 3),
-  SurahModel(number: 111, name: "المسد", revelationType: "مكية", versesCount: 5),
-  SurahModel(number: 112, name: "الإخلاص", revelationType: "مكية", versesCount: 4),
-  SurahModel(number: 113, name: "الفلق", revelationType: "مكية", versesCount: 5),
-  SurahModel(number: 114, name: "الناس", revelationType: "مكية", versesCount: 6),
-];
-
-class TajweedParser {
-  static const Map<String, Color> ruleColors = {
-    'ghunnah': Color(0xFF169777),
-    'iqlab': Color(0xFF26BFFD),
-    'qalqalah': Color(0xFF0055FF),
-    'madd_normal': Color(0xFFD48B00),
-    'madd_permissible': Color(0xFFFF6600),
-    'madd_obligatory': Color(0xFFD50000),
-    'ham_wasl': Color(0xFF9E9E9E),
-  };
-
-  static List<TextSpan> parseTajweedText(String rawText, bool enableTajweed) {
-    if (!enableTajweed) {
-      final cleanText = rawText.replaceAllMapped(
-        RegExp(r'\[[a-zA-Z_]+(?::\d+)?\[([^\]]+)\]'),
-        (match) => match.group(1) ?? '',
-      );
-      return [TextSpan(text: cleanText)];
-    }
-
-    if (rawText.contains('[')) {
-      final List<TextSpan> spans = [];
-      final RegExp regex = RegExp(r'\[([a-zA-Z_]+)(?::\d+)?\[([^\]]+)\]');
-      int lastIndex = 0;
-
-      for (final Match match in regex.allMatches(rawText)) {
-        if (match.start > lastIndex) {
-          spans.add(TextSpan(text: rawText.substring(lastIndex, match.start)));
-        }
-        final String ruleCode = match.group(1) ?? '';
-        final String coloredSegment = match.group(2) ?? '';
-        spans.add(
-          TextSpan(
-            text: coloredSegment,
-            style: TextStyle(
-              color: _mapShortCodeToColor(ruleCode),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        );
-        lastIndex = match.end;
-      }
-
-      if (lastIndex < rawText.length) {
-        spans.add(TextSpan(text: rawText.substring(lastIndex)));
-      }
-      return spans;
-    }
-
-    return _applyHeuristicTajweed(rawText);
-  }
-
-  static Color _mapShortCodeToColor(String code) {
-    switch (code) {
-      case 'g':
-      case 'c':
-      case 'f':
-      case 'w':
-      case 'a':
-        return ruleColors['ghunnah']!;
-      case 'i':
-        return ruleColors['iqlab']!;
-      case 'q':
-        return ruleColors['qalqalah']!;
-      case 'n':
-        return ruleColors['madd_normal']!;
-      case 'p':
-        return ruleColors['madd_permissible']!;
-      case 'o':
-      case 'm':
-        return ruleColors['madd_obligatory']!;
-      default:
-        return const Color(0xFF1F1F1F);
-    }
-  }
-
-  static List<TextSpan> _applyHeuristicTajweed(String text) {
-    final List<TextSpan> spans = [];
-    final RegExp ruleRegex = RegExp(r'([قطبجد]ْ|[نم]ّ|[اوي]?ٓ|[ٱ])');
-
-    int lastIdx = 0;
-    for (final match in ruleRegex.allMatches(text)) {
-      if (match.start > lastIdx) {
-        spans.add(TextSpan(text: text.substring(lastIdx, match.start)));
-      }
-      final String token = match.group(0)!;
-      Color color = const Color(0xFF1F1F1F);
-
-      if (token.contains('ْ')) {
-        color = ruleColors['qalqalah']!;
-      } else if (token.contains('ّ')) {
-        color = ruleColors['ghunnah']!;
-      } else if (token.contains('ٓ')) {
-        color = ruleColors['madd_obligatory']!;
-      } else if (token == 'ٱ') {
-        color = ruleColors['ham_wasl']!;
-      }
-
-      spans.add(TextSpan(text: token, style: TextStyle(color: color)));
-      lastIdx = match.end;
-    }
-
-    if (lastIdx < text.length) {
-      spans.add(TextSpan(text: text.substring(lastIdx)));
-    }
-    return spans;
-  }
-}
-
-class MainHomeScreen extends StatefulWidget {
-  const MainHomeScreen({super.key});
+// ==========================================
+// 3. شاشة اللعبة والمحرك الفيزيائي
+// ==========================================
+class GameScreen extends StatefulWidget {
+  const GameScreen({super.key});
 
   @override
-  State<MainHomeScreen> createState() => _MainHomeScreenState();
+  State<GameScreen> createState() => _GameScreenState();
 }
 
-class _MainHomeScreenState extends State<MainHomeScreen> {
-  int _selectedTabIndex = 0;
-  final TextEditingController _searchController = TextEditingController();
-  List<SurahModel> _filteredSurahs = kAllSurahs;
+class _GameScreenState extends State<GameScreen> {
+  Timer? _gameTimer;
+  final Random _rng = Random();
 
-  SurahModel _activeSurah = kAllSurahs[0];
-  bool _isWarshEdition = true;
-  bool _enableTajweedColors = true;
-  bool _isPageViewMode = false;
+  static const double worldWidth = 2600.0;
+  static const double groundY = 620.0;
 
-  BookmarkModel? _savedBookmark = BookmarkModel(
-    surahNumber: 18,
-    surahName: "الكهف",
-    ayahNumber: 1,
-    timestamp: DateTime.now(),
-  );
+  Offset _playerPos = const Offset(200, 520);
+  Offset _playerVel = Offset.zero;
+  final Size _playerSize = const Size(34, 48);
+  int _facing = 1;
+  bool _onGround = false;
+  int _jumpsRemaining = 2;
+  double _invulnTimer = 0.0;
+  int _masks = 5;
+  final int _maxMasks = 5;
+  double _soul = 45.0;
 
-  late final AudioPlayer _audioPlayer;
-  ReciterModel _selectedReciter = kWarshReciters[0];
-  SurahModel? _playingSurah;
-  PlayerState _playerState = PlayerState.stopped;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
-  bool _isAudioLoading = false;
+  bool _moveLeft = false;
+  bool _moveRight = false;
+  bool _aimUp = false;
+  bool _aimDown = false;
+  bool _jumpHeld = false;
 
-  StreamSubscription? _playerStateSub;
-  StreamSubscription? _positionSub;
-  StreamSubscription? _durationSub;
-  StreamSubscription? _completeSub;
+  double _dashTime = 0.0;
+  double _dashCooldown = 0.0;
+
+  double _slashTimer = 0.0;
+  double _slashCooldown = 0.0;
+  SlashDir _currentSlashDir = SlashDir.right;
+  final Set<int> _slashedEnemiesInSwing = {};
+
+  double _hitStopTimer = 0.0;
+  double _screenShake = 0.0;
+  Offset _cameraPos = Offset.zero;
+
+  late List<PlatformRect> _platforms;
+  final List<EnemyEntity> _enemies = [];
+  final List<GhostAfterImage> _ghosts = [];
+  final List<GameParticle> _particles = [];
+  final List<AmbientSpore> _spores = [];
+  final List<SoulSpellProjectile> _spells = [];
+  final List<ShockwaveHazard> _shockwaves = [];
+
+  int _enemyIdCounter = 1;
+  bool _bossDefeated = false;
+  bool _isGameOver = false;
 
   @override
   void initState() {
     super.initState();
-    _initAudioPlayer();
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  void _initAudioPlayer() {
-    _audioPlayer = AudioPlayer();
-
-    _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          _playerState = state;
-          if (state == PlayerState.playing) {
-            _isAudioLoading = false;
-          }
-        });
-      }
-    });
-
-    _positionSub = _audioPlayer.onPositionChanged.listen((pos) {
-      if (mounted) setState(() => _currentPosition = pos);
-    });
-
-    _durationSub = _audioPlayer.onDurationChanged.listen((dur) {
-      if (mounted) setState(() => _totalDuration = dur);
-    });
-
-    _completeSub = _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) {
-        setState(() {
-          _playerState = PlayerState.stopped;
-          _currentPosition = Duration.zero;
-        });
-      }
+    _initWorld();
+    _gameTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      _updateGame(0.016);
     });
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    _playerStateSub?.cancel();
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _completeSub?.cancel();
-    _audioPlayer.dispose();
+    _gameTimer?.cancel();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    final query = _searchController.text.trim();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredSurahs = kAllSurahs;
-      } else {
-        _filteredSurahs = kAllSurahs.where((surah) {
-          return surah.name.contains(query) || surah.number.toString() == query;
-        }).toList();
-      }
-    });
-  }
+  void _initWorld() {
+    _masks = _maxMasks;
+    _soul = 45.0;
+    _playerPos = const Offset(180, 520);
+    _playerVel = Offset.zero;
+    _bossDefeated = false;
+    _isGameOver = false;
+    _enemies.clear();
+    _particles.clear();
+    _ghosts.clear();
+    _spells.clear();
+    _shockwaves.clear();
 
-  Future<void> _playSurahAudio(SurahModel surah) async {
-    setState(() {
-      _playingSurah = surah;
-      _isAudioLoading = true;
-    });
+    _platforms = [
+      const PlatformRect(Rect.fromLTWH(0, groundY, worldWidth, 250)),
+      const PlatformRect(Rect.fromLTWH(-60, -200, 60, 1000)),
+      const PlatformRect(Rect.fromLTWH(worldWidth, -200, 60, 1000)),
+      const PlatformRect(Rect.fromLTWH(320, 480, 180, 24)),
+      const PlatformRect(Rect.fromLTWH(590, 370, 190, 24)),
+      const PlatformRect(Rect.fromLTWH(880, 460, 210, 24)),
+      const PlatformRect(Rect.fromLTWH(620, groundY - 18, 230, 18), isHazard: true),
+      const PlatformRect(Rect.fromLTWH(1150, 390, 200, 24)),
+      const PlatformRect(Rect.fromLTWH(1420, 490, 170, 24)),
+      const PlatformRect(Rect.fromLTWH(1780, 450, 150, 22)),
+      const PlatformRect(Rect.fromLTWH(2220, 450, 150, 22)),
+    ];
 
-    final String formattedNumber = surah.number.toString().padLeft(3, '0');
-    final String audioUrl = '${_selectedReciter.serverUrl}$formattedNumber.mp3';
-
-    try {
-      await _audioPlayer.stop();
-      await _audioPlayer.play(UrlSource(audioUrl));
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isAudioLoading = false);
+    if (_spores.isEmpty) {
+      for (int i = 0; i < 65; i++) {
+        _spores.add(
+          AmbientSpore(
+            pos: Offset(_rng.nextDouble() * worldWidth, _rng.nextDouble() * groundY),
+            radius: 1.5 + _rng.nextDouble() * 3.0,
+            speedY: 10.0 + _rng.nextDouble() * 20.0,
+            phase: _rng.nextDouble() * pi * 2,
+            color: i % 3 == 0
+                ? const Color(0xFF88D4FF)
+                : (i % 4 == 0 ? const Color(0xFFFF9E44) : const Color(0xFFDCE8F2)),
+          ),
+        );
       }
     }
+
+    _spawnEnemies();
   }
 
-  Future<void> _togglePlayPause() async {
-    if (_playingSurah == null) {
-      await _playSurahAudio(_activeSurah);
+  void _spawnEnemies() {
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.crawler,
+      pos: const Offset(410, 458),
+      size: const Size(38, 32),
+      hp: 3,
+      patrolMinX: 335,
+      patrolMaxX: 485,
+    ));
+
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.crawler,
+      pos: const Offset(980, 438),
+      size: const Size(38, 32),
+      hp: 3,
+      patrolMinX: 895,
+      patrolMaxX: 1070,
+    ));
+
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.crawler,
+      pos: const Offset(1320, groundY - 20),
+      size: const Size(42, 34),
+      hp: 4,
+      patrolMinX: 1120,
+      patrolMaxX: 1550,
+    ));
+
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.flyinghusks,
+      pos: const Offset(735, 500),
+      size: const Size(40, 40),
+      hp: 3,
+      patrolMinX: 650,
+      patrolMaxX: 820,
+    ));
+
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.flyinghusks,
+      pos: const Offset(1250, 260),
+      size: const Size(40, 40),
+      hp: 3,
+      patrolMinX: 1140,
+      patrolMaxX: 1380,
+    ));
+
+    _enemies.add(EnemyEntity(
+      id: _enemyIdCounter++,
+      type: EnemyType.falseGuardBoss,
+      pos: const Offset(2120, groundY - 58),
+      size: const Size(86, 112),
+      hp: 22,
+      patrolMinX: 1700,
+      patrolMaxX: 2480,
+    ));
+  }
+
+  void _updateGame(double dt) {
+    if (_isGameOver) return;
+
+    if (_hitStopTimer > 0) {
+      _hitStopTimer -= dt;
+      if (_screenShake > 0) {
+        _screenShake = max(0, _screenShake - dt * 28);
+      }
+      setState(() {});
       return;
     }
-    if (_playerState == PlayerState.playing) {
-      await _audioPlayer.pause();
+
+    if (_invulnTimer > 0) _invulnTimer -= dt;
+    if (_dashCooldown > 0) _dashCooldown -= dt;
+    if (_slashCooldown > 0) _slashCooldown -= dt;
+    if (_screenShake > 0) _screenShake = max(0, _screenShake - dt * 35);
+
+    _updatePlayerPhysics(dt);
+    _updateSlashCombat(dt);
+    _updateSoulSpells(dt);
+    _updateEnemies(dt);
+    _updateShockwaves(dt);
+    _updateParticlesAndGhosts(dt);
+
+    setState(() {});
+  }
+
+  void _updatePlayerPhysics(double dt) {
+    if (_dashTime > 0) {
+      _dashTime -= dt;
+      _playerVel = Offset(_facing * 790.0, 0);
+      _ghosts.add(
+        GhostAfterImage(
+          pos: _playerPos,
+          facing: _facing,
+          alpha: 0.75,
+          isShadeDash: true,
+        ),
+      );
     } else {
-      await _audioPlayer.resume();
+      double targetVx = 0;
+      if (_moveLeft) {
+        targetVx = -290.0;
+        _facing = -1;
+      } else if (_moveRight) {
+        targetVx = 290.0;
+        _facing = 1;
+      }
+
+      final double accel = _onGround ? 18.0 : 12.0;
+      _playerVel = Offset(
+        _playerVel.dx + (targetVx - _playerVel.dx) * min(1.0, accel * dt),
+        _playerVel.dy,
+      );
+
+      double gravity = 1480.0;
+      if (!_jumpHeld && _playerVel.dy < -120) {
+        gravity *= 2.4;
+      }
+      final double newVy = min(860.0, _playerVel.dy + gravity * dt);
+      _playerVel = Offset(_playerVel.dx, newVy);
+    }
+
+    Offset nextPos = _playerPos + _playerVel * dt;
+    _onGround = false;
+
+    Rect playerRect = Rect.fromCenter(
+      center: Offset(nextPos.dx, _playerPos.dy),
+      width: _playerSize.width,
+      height: _playerSize.height,
+    );
+
+    for (final plat in _platforms) {
+      if (plat.isHazard) continue;
+      if (playerRect.overlaps(plat.rect)) {
+        if (_playerVel.dx > 0) {
+          nextPos = Offset(plat.rect.left - _playerSize.width / 2, nextPos.dy);
+        } else if (_playerVel.dx < 0) {
+          nextPos = Offset(plat.rect.right + _playerSize.width / 2, nextPos.dy);
+        }
+        _playerVel = Offset(0, _playerVel.dy);
+      }
+    }
+
+    playerRect = Rect.fromCenter(
+      center: Offset(nextPos.dx, nextPos.dy),
+      width: _playerSize.width,
+      height: _playerSize.height,
+    );
+
+    for (final plat in _platforms) {
+      if (playerRect.overlaps(plat.rect)) {
+        if (plat.isHazard) {
+          _damagePlayer(1, Offset(nextPos.dx, plat.rect.top));
+          _playerVel = const Offset(0, -480);
+          break;
+        }
+        if (_playerVel.dy >= 0 && (_playerPos.dy + _playerSize.height / 2) <= plat.rect.top + 18) {
+          nextPos = Offset(nextPos.dx, plat.rect.top - _playerSize.height / 2);
+          _playerVel = Offset(_playerVel.dx, 0);
+          _onGround = true;
+          _jumpsRemaining = 2;
+        } else if (_playerVel.dy < 0 &&
+            (_playerPos.dy - _playerSize.height / 2) >= plat.rect.bottom - 18) {
+          nextPos = Offset(nextPos.dx, plat.rect.bottom + _playerSize.height / 2);
+          _playerVel = Offset(_playerVel.dx, 0);
+        }
+      }
+    }
+
+    _playerPos = nextPos;
+  }
+
+  void _triggerNailSlash() {
+    if (_slashCooldown > 0) return;
+
+    _slashTimer = 0.14;
+    _slashCooldown = 0.25;
+    _slashedEnemiesInSwing.clear();
+
+    if (_aimDown && !_onGround) {
+      _currentSlashDir = SlashDir.down;
+    } else if (_aimUp) {
+      _currentSlashDir = SlashDir.up;
+    } else {
+      _currentSlashDir = _facing == 1 ? SlashDir.right : SlashDir.left;
     }
   }
 
-  void _openSurahReader(SurahModel surah, {int initialAyah = 1}) {
-    setState(() {
-      _activeSurah = surah;
-      _selectedTabIndex = 1;
-    });
+  Rect _getSlashHitbox() {
+    switch (_currentSlashDir) {
+      case SlashDir.right:
+        return Rect.fromCenter(
+          center: _playerPos + const Offset(48, 0),
+          width: 78,
+          height: 54,
+        );
+      case SlashDir.left:
+        return Rect.fromCenter(
+          center: _playerPos + const Offset(-48, 0),
+          width: 78,
+          height: 54,
+        );
+      case SlashDir.up:
+        return Rect.fromCenter(
+          center: _playerPos + const Offset(0, -52),
+          width: 68,
+          height: 70,
+        );
+      case SlashDir.down:
+        return Rect.fromCenter(
+          center: _playerPos + const Offset(0, 52),
+          width: 72,
+          height: 72,
+        );
+    }
   }
 
-  void _saveBookmark(SurahModel surah, int ayahNumber) {
-    setState(() {
-      _savedBookmark = BookmarkModel(
-        surahNumber: surah.number,
-        surahName: surah.name,
-        ayahNumber: ayahNumber,
-        timestamp: DateTime.now(),
+  void _updateSlashCombat(double dt) {
+    if (_slashTimer <= 0) return;
+    _slashTimer -= dt;
+
+    final Rect hitbox = _getSlashHitbox();
+
+    if (_currentSlashDir == SlashDir.down && _slashedEnemiesInSwing.isEmpty) {
+      for (final plat in _platforms) {
+        if (plat.isHazard && hitbox.overlaps(plat.rect)) {
+          _slashedEnemiesInSwing.add(-999);
+          _playerVel = Offset(_playerVel.dx, -540);
+          _jumpsRemaining = 2;
+          _dashCooldown = 0;
+          _screenShake = 6.0;
+          _spawnHitParticles(Offset(_playerPos.dx, plat.rect.top), const Color(0xFFFFFFFF), 12);
+          break;
+        }
+      }
+    }
+
+    for (final enemy in _enemies) {
+      if (_slashedEnemiesInSwing.contains(enemy.id)) continue;
+      if (hitbox.overlaps(enemy.bounds)) {
+        _slashedEnemiesInSwing.add(enemy.id);
+        enemy.hp -= 1;
+        enemy.flashTimer = 0.14;
+
+        _soul = min(100.0, _soul + 14.0);
+        _hitStopTimer = 0.045;
+        _screenShake = 9.5;
+
+        if (_currentSlashDir == SlashDir.down) {
+          _playerVel = Offset(_playerVel.dx, -570.0);
+          _jumpsRemaining = 2;
+          _dashCooldown = 0.0;
+        } else if (_currentSlashDir == SlashDir.right) {
+          _playerVel = Offset(-190.0, _playerVel.dy);
+          enemy.vel = Offset(enemy.type == EnemyType.falseGuardBoss ? 90 : 280, -90);
+        } else if (_currentSlashDir == SlashDir.left) {
+          _playerVel = Offset(190.0, _playerVel.dy);
+          enemy.vel = Offset(enemy.type == EnemyType.falseGuardBoss ? -90 : -280, -90);
+        } else if (_currentSlashDir == SlashDir.up) {
+          _playerVel = Offset(_playerVel.dx, 140.0);
+          enemy.vel = Offset(enemy.vel.dx, -220);
+        }
+
+        _spawnHitParticles(enemy.pos, const Color(0xFFFFFFFF), 14);
+        _spawnHitParticles(enemy.pos, const Color(0xFFFF8C24), 12);
+      }
+    }
+  }
+
+  void _castSoulOrHeal() {
+    if (_soul < 33.0) return;
+
+    if (_masks < _maxMasks && _onGround && !_moveLeft && !_moveRight) {
+      _soul -= 33.0;
+      _masks = min(_maxMasks, _masks + 1);
+      _screenShake = 6.0;
+      _spawnHitParticles(_playerPos, const Color(0xFFFFFFFF), 28);
+    } else {
+      _soul -= 33.0;
+      _screenShake = 11.0;
+      _hitStopTimer = 0.03;
+      _playerVel = Offset(-_facing * 240.0, 0);
+      _spells.add(
+        SoulSpellProjectile(
+          pos: _playerPos + Offset(_facing * 28.0, 0),
+          vel: Offset(_facing * 780.0, 0),
+        ),
       );
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('تم حفظ العلامة: سورة ${surah.name} - الآية $ayahNumber'),
-        backgroundColor: const Color(0xFF0A4D3C),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      _spawnHitParticles(_playerPos + Offset(_facing * 25.0, 0), const Color(0xFFD8F4FF), 20);
+    }
   }
 
+  void _updateSoulSpells(double dt) {
+    for (int i = _spells.length - 1; i >= 0; i--) {
+      final spell = _spells[i];
+      spell.life -= dt;
+      spell.pos += spell.vel * dt;
+
+      _particles.add(
+        GameParticle(
+          pos: spell.pos + Offset((_rng.nextDouble() - 0.5) * 12, (_rng.nextDouble() - 0.5) * 18),
+          vel: Offset(-spell.vel.dx * 0.15, (_rng.nextDouble() - 0.5) * 60),
+          color: const Color(0xFFE0F7FF),
+          size: 4 + _rng.nextDouble() * 5,
+          life: 0.25,
+          gravityAffected: false,
+        ),
+      );
+
+      final Rect spellBounds = Rect.fromCircle(center: spell.pos, radius: spell.radius);
+      for (final enemy in _enemies) {
+        if (!spell.hitEnemyIds.contains(enemy.id) && spellBounds.overlaps(enemy.bounds)) {
+          spell.hitEnemyIds.add(enemy.id);
+          enemy.hp -= 3;
+          enemy.flashTimer = 0.2;
+          enemy.vel = Offset(spell.vel.dx.sign * 260, -100);
+          _hitStopTimer = 0.05;
+          _screenShake = 12.0;
+          _spawnHitParticles(enemy.pos, const Color(0xFFFFFFFF), 22);
+        }
+      }
+
+      if (spell.life <= 0 || spell.pos.dx < 0 || spell.pos.dx > worldWidth) {
+        _spells.removeAt(i);
+      }
+    }
+  }
+
+  void _updateEnemies(double dt) {
+    for (int i = _enemies.length - 1; i >= 0; i--) {
+      final e = _enemies[i];
+      if (e.flashTimer > 0) e.flashTimer -= dt;
+
+      if (e.hp <= 0) {
+        _spawnHitParticles(e.pos, const Color(0xFFFF7A18), 32);
+        _spawnHitParticles(e.pos, const Color(0xFFFFFFFF), 20);
+        _screenShake = e.type == EnemyType.falseGuardBoss ? 22.0 : 10.0;
+        if (e.type == EnemyType.falseGuardBoss) {
+          _bossDefeated = true;
+        }
+        _enemies.removeAt(i);
+        continue;
+      }
+
+      if (e.type == EnemyType.crawler) {
+        e.vel = Offset(e.VelXWithPatrol(85.0), e.vel.dy);
+        e.pos += e.vel * dt;
+        e.vel = Offset(e.vel.dx * 0.9, 0);
+        if (e.pos.dx <= e.patrolMinX) e.facing = 1;
+        if (e.pos.dx >= e.patrolMaxX) e.facing = -1;
+      } else if (e.type == EnemyType.flyinghusks) {
+        e.aiTimer += dt * 2.5;
+        e.pos = Offset(
+          e.pos.dx + e.facing * 75.0 * dt + e.vel.dx * dt,
+          e.pos.dy + sin(e.aiTimer) * 45.0 * dt,
+        );
+        e.vel = Offset(e.vel.dx * 0.88, 0);
+        if (e.pos.dx <= e.patrolMinX) e.facing = 1;
+        if (e.pos.dx >= e.patrolMaxX) e.facing = -1;
+      } else if (e.type == EnemyType.falseGuardBoss) {
+        _updateBossAI(e, dt);
+      }
+
+      if (_invulnTimer <= 0 && _dashTime <= 0) {
+        final Rect pBounds = Rect.fromCenter(
+          center: _playerPos,
+          width: _playerSize.width * 0.8,
+          height: _playerSize.height * 0.85,
+        );
+        if (pBounds.overlaps(e.bounds)) {
+          _damagePlayer(1, e.pos);
+        }
+      }
+    }
+  }
+
+  void _updateBossAI(EnemyEntity boss, double dt) {
+    boss.aiTimer += dt;
+    final double distToPlayer = (_playerPos.dx - boss.pos.dx).abs();
+
+    boss.vel = Offset(boss.vel.dx * 0.9, boss.vel.dy + 1350.0 * dt);
+    boss.pos += boss.vel * dt;
+
+    if (boss.pos.dy >= groundY - boss.size.height / 2) {
+      boss.pos = Offset(boss.pos.dx, groundY - boss.size.height / 2);
+      if (!boss.onGround && boss.bossState == 2) {
+        _screenShake = 18.0;
+        _spawnHitParticles(
+          Offset(boss.pos.dx, groundY),
+          const Color(0xFFFF9233),
+          35,
+        );
+        _shockwaves.add(ShockwaveHazard(pos: Offset(boss.pos.dx - 30, groundY), vx: -360));
+        _shockwaves.add(ShockwaveHazard(pos: Offset(boss.pos.dx + 30, groundY), vx: 360));
+        boss.bossState = 0;
+        boss.aiTimer = 0;
+      }
+      boss.vel = Offset(boss.vel.dx, 0);
+      boss.onGround = true;
+    } else {
+      boss.onGround = false;
+    }
+
+    boss.pos = Offset(boss.pos.dx.clamp(boss.patrolMinX, boss.patrolMaxX), boss.pos.dy);
+
+    if (distToPlayer > 900) return;
+
+    if (boss.bossState == 0) {
+      boss.facing = _playerPos.dx >= boss.pos.dx ? 1 : -1;
+      boss.pos = Offset(boss.pos.dx + boss.facing * 95.0 * dt, boss.pos.dy);
+
+      if (boss.aiTimer > 1.8) {
+        boss.bossState = 1;
+        boss.aiTimer = 0;
+      }
+    } else if (boss.bossState == 1) {
+      if (boss.aiTimer > 0.55) {
+        boss.bossState = 2;
+        boss.facing = _playerPos.dx >= boss.pos.dx ? 1 : -1;
+        boss.vel = Offset(boss.facing * 340.0, -680.0);
+        boss.onGround = false;
+      }
+    }
+  }
+
+  void _updateShockwaves(double dt) {
+    for (int i = _shockwaves.length - 1; i >= 0; i--) {
+      final sw = _shockwaves[i];
+      sw.life -= dt;
+      sw.pos = Offset(sw.pos.dx + sw.vx * dt, sw.pos.dy);
+
+      final Rect pBounds = Rect.fromCenter(
+        center: _playerPos,
+        width: _playerSize.width * 0.8,
+        height: _playerSize.height * 0.85,
+      );
+
+      if (_invulnTimer <= 0 && _dashTime <= 0 && pBounds.overlaps(sw.bounds)) {
+        _damagePlayer(1, sw.pos);
+      }
+
+      if (sw.life <= 0) {
+        _shockwaves.removeAt(i);
+      }
+    }
+  }
+
+  void _damagePlayer(int amount, Offset sourcePos) {
+    if (_invulnTimer > 0) return;
+    _masks = max(0, _masks - amount);
+    _invulnTimer = 1.35;
+    _hitStopTimer = 0.08;
+    _screenShake = 16.0;
+
+    final double dir = (_playerPos.dx >= sourcePos.dx) ? 1.0 : -1.0;
+    _playerVel = Offset(dir * 320.0, -360.0);
+
+    _spawnHitParticles(_playerPos, const Color(0xFFFFFFFF), 22);
+    _spawnHitParticles(_playerPos, const Color(0xFF11131A), 18);
+
+    if (_masks <= 0) {
+      _isGameOver = true;
+    }
+  }
+
+  void _spawnHitParticles(Offset origin, Color color, int count) {
+    for (int i = 0; i < count; i++) {
+      final double angle = _rng.nextDouble() * pi * 2;
+      final double speed = 80.0 + _rng.nextDouble() * 380.0;
+      _particles.add(
+        GameParticle(
+          pos: origin,
+          vel: Offset(cos(angle) * speed, sin(angle) * speed - 60),
+          color: color,
+          size: 2.5 + _rng.nextDouble() * 5.0,
+          life: 0.25 + _rng.nextDouble() * 0.35,
+        ),
+      );
+    }
+  }
+
+  void _updateParticlesAndGhosts(double dt) {
+    for (int i = _ghosts.length - 1; i >= 0; i--) {
+      _ghosts[i].alpha -= dt * 3.8;
+      if (_ghosts[i].alpha <= 0) _ghosts.removeAt(i);
+    }
+
+    for (int i = _particles.length - 1; i >= 0; i--) {
+      final p = _particles[i];
+      p.life -= dt;
+      if (p.gravityAffected) {
+        p.vel = Offset(p.vel.dx * 0.96, p.vel.dy + 680.0 * dt);
+      }
+      p.pos += p.vel * dt;
+      if (p.life <= 0) _particles.removeAt(i);
+    }
+
+    for (final s in _spores) {
+      s.phase += dt * 1.8;
+      s.pos = Offset(
+        s.pos.dx + sin(s.phase) * 14.0 * dt,
+        s.pos.dy - s.speedY * dt,
+      );
+      if (s.pos.dy < 40) {
+        s.pos = Offset(s.pos.dx, groundY - 10);
+      }
+    }
+  }
+
+  // ==========================================
+  // 8. بناء الواجهة وأزرار اللمس
+  // ==========================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37)),
-            const SizedBox(width: 8),
-            Text(
-              _selectedTabIndex == 0
-                  ? 'المصحف الشريف (ورش)'
-                  : _selectedTabIndex == 1
-                      ? 'سورة ${_activeSurah.name}'
-                      : 'السبحة الإلكترونية',
-            ),
-          ],
-        ),
-      ),
-      drawer: _buildIslamicDrawer(),
-      body: Column(
-        children: [
-          Expanded(
-            child: IndexedStack(
-              index: _selectedTabIndex,
-              children: [
-                _buildSurahIndexTab(),
-                SurahReaderView(
-                  surah: _activeSurah,
-                  isWarshEdition: _isWarshEdition,
-                  enableTajweedColors: _enableTajweedColors,
-                  isPageViewMode: _isPageViewMode,
-                  bookmarkedAyah: _savedBookmark?.surahNumber == _activeSurah.number
-                      ? _savedBookmark?.ayahNumber
-                      : null,
-                  onBookmarkAyah: (ayahNum) => _saveBookmark(_activeSurah, ayahNum),
-                  onPlaySurah: () => _playSurahAudio(_activeSurah),
-                  onToggleEdition: (val) => setState(() => _isWarshEdition = val),
-                  onToggleTajweed: (val) => setState(() => _enableTajweedColors = val),
-                  onToggleViewMode: (val) => setState(() => _isPageViewMode = val),
-                  onChangeSurah: (newSurah) => setState(() => _activeSurah = newSurah),
-                ),
-                const TasbihScreenView(),
-              ],
-            ),
-          ),
-          _buildPersistentAudioPlayer(),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedTabIndex,
-        onDestinationSelected: (idx) => setState(() => _selectedTabIndex = idx),
-        backgroundColor: const Color(0xFFF6F1E3),
-        indicatorColor: const Color(0xFF0A4D3C).withOpacity(0.15),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.format_list_numbered_rtl),
-            label: 'فهرس السور',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_stories),
-            label: 'تصفح المصحف',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.radio_button_checked),
-            label: 'السبحة الرقمية',
-          ),
-        ],
-      ),
-    );
-  }
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final Size screenSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-  Widget _buildSurahIndexTab() {
-    return Column(
-      children: [
-        if (_savedBookmark != null)
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0A4D3C), Color(0xFF126E56)],
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.bookmark_added_rounded, color: Color(0xFFD4AF37), size: 28),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'آخر قراءة: سورة ${_savedBookmark!.surahName} (الآية ${_savedBookmark!.ayahNumber})',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: const Color(0xFF0A4D3C),
-                  ),
-                  onPressed: () {
-                    final surah = kAllSurahs.firstWhere((s) => s.number == _savedBookmark!.surahNumber);
-                    _openSurahReader(surah, initialAyah: _savedBookmark!.ayahNumber);
-                  },
-                  child: const Text('متابعة'),
-                ),
-              ],
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'ابحث باسم السورة أو رقمها...',
-              prefixIcon: const Icon(Icons.search, color: Color(0xFF0A4D3C)),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _filteredSurahs.length,
-            itemBuilder: (context, index) {
-              final surah = _filteredSurahs[index];
-              final isPlayingThis = _playingSurah?.number == surah.number && _playerState == PlayerState.playing;
+          final double targetCamX =
+              (_playerPos.dx - screenSize.width * 0.42).clamp(0.0, max(0.0, worldWidth - screenSize.width));
+          final double targetCamY =
+              (_playerPos.dy - screenSize.height * 0.58).clamp(-120.0, 120.0);
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: const Color(0xFF0A4D3C),
-                    foregroundColor: Colors.white,
-                    child: Text('${surah.number}'),
-                  ),
-                  title: Text('سورة ${surah.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${surah.revelationType} • ${surah.versesCount} آية'),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isPlayingThis ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                      color: const Color(0xFFD4AF37),
-                      size: 32,
-                    ),
-                    onPressed: () => isPlayingThis ? _togglePlayPause() : _playSurahAudio(surah),
-                  ),
-                  onTap: () => _openSurahReader(surah),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+          final Offset shakeOffset = _screenShake > 0
+              ? Offset(
+                  (_rng.nextDouble() - 0.5) * _screenShake * 2.2,
+                  (_rng.nextDouble() - 0.5) * _screenShake * 2.2,
+                )
+              : Offset.zero;
 
-  Widget _buildPersistentAudioPlayer() {
-    final surahToDisplay = _playingSurah ?? _activeSurah;
-    final maxSec = _totalDuration.inSeconds > 0 ? _totalDuration.inSeconds.toDouble() : 1.0;
-    final currentSec = _currentPosition.inSeconds.toDouble().clamp(0.0, maxSec);
+          _cameraPos = Offset(
+                _cameraPos.dx + (targetCamX - _cameraPos.dx) * 0.14,
+                _cameraPos.dy + (targetCamY - _cameraPos.dy) * 0.14,
+              ) +
+              shakeOffset;
 
-    return Container(
-      color: const Color(0xFF0A4D3C),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          if (_isAudioLoading)
-            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Color(0xFFD4AF37), strokeWidth: 2))
-          else
-            IconButton(
-              icon: Icon(
-                _playerState == PlayerState.playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                color: const Color(0xFFD4AF37),
-                size: 36,
-              ),
-              onPressed: _togglePlayPause,
-            ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('تلاوة سورة ${surahToDisplay.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                Text('${_selectedReciter.name} (ورش)', style: const TextStyle(color: Color(0xFFE6DEC8), fontSize: 11)),
-              ],
-            ),
-          ),
-          PopupMenuButton<ReciterModel>(
-            icon: const Icon(Icons.record_voice_over, color: Color(0xFFD4AF37)),
-            onSelected: (reciter) {
-              setState(() => _selectedReciter = reciter);
-              if (_playingSurah != null) _playSurahAudio(_playingSurah!);
-            },
-            itemBuilder: (context) => kWarshReciters.map((r) => PopupMenuItem(value: r, child: Text(r.name))).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIslamicDrawer() {
-    return Drawer(
-      child: ListView(
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFF0A4D3C)),
-            child: Center(
-              child: Text(
-                'مصحف ورش والتجويد الملون',
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.format_list_numbered_rtl),
-            title: const Text('فهرس السور'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedTabIndex = 0);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.auto_stories),
-            title: const Text('تصفح المصحف'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedTabIndex = 1);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.radio_button_checked),
-            title: const Text('السبحة الرقمية'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedTabIndex = 2);
-            },
-          ),
-          SwitchListTile(
-            title: const Text('ألوان التجويد'),
-            value: _enableTajweedColors,
-            onChanged: (val) {
-              setState(() => _enableTajweedColors = val);
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class SurahReaderView extends StatefulWidget {
-  final SurahModel surah;
-  final bool isWarshEdition;
-  final bool enableTajweedColors;
-  final bool isPageViewMode;
-  final int? bookmarkedAyah;
-  final ValueChanged<int> onBookmarkAyah;
-  final VoidCallback onPlaySurah;
-  final ValueChanged<bool> onToggleEdition;
-  final ValueChanged<bool> onToggleTajweed;
-  final ValueChanged<bool> onToggleViewMode;
-  final ValueChanged<SurahModel> onChangeSurah;
-
-  const SurahReaderView({
-    super.key,
-    required this.surah,
-    required this.isWarshEdition,
-    required this.enableTajweedColors,
-    required this.isPageViewMode,
-    required this.bookmarkedAyah,
-    required this.onBookmarkAyah,
-    required this.onPlaySurah,
-    required this.onToggleEdition,
-    required this.onToggleTajweed,
-    required this.onToggleViewMode,
-    required this.onChangeSurah,
-  });
-
-  @override
-  State<SurahReaderView> createState() => _SurahReaderViewState();
-}
-
-class _SurahReaderViewState extends State<SurahReaderView> {
-  bool _isLoading = true;
-  String? _errorMessage;
-  List<AyahModel> _ayahs = [];
-  double _fontSize = 22.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchSurahData();
-  }
-
-  @override
-  void didUpdateWidget(covariant SurahReaderView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.surah.number != widget.surah.number || oldWidget.isWarshEdition != widget.isWarshEdition) {
-      _fetchSurahData();
-    }
-  }
-
-  Future<void> _fetchSurahData() async {
-    final String edition = widget.isWarshEdition ? 'quran-warsh' : 'quran-tajweed';
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final Uri url = Uri.parse('https://api.alquran.cloud/v1/surah/${widget.surah.number}/$edition');
-      final response = await http.get(url).timeout(const Duration(seconds: 12));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> decoded = json.decode(response.body);
-        final List<dynamic> rawAyahs = decoded['data']['ayahs'];
-
-        setState(() {
-          _ayahs = rawAyahs.map((item) => AyahModel(
-            numberInSurah: item['numberInSurah'] ?? 1,
-            text: item['text'] ?? '',
-            page: item['page'] ?? 1,
-            juz: item['juz'] ?? 1,
-          )).toList();
-          _isLoading = false;
-        });
-      } else {
-        throw Exception();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'تعذر تحميل الآيات. يرجى التحقق من اتصال الإنترنت.';
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          color: const Color(0xFFF6F1E3),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return Stack(
             children: [
-              ChoiceChip(
-                label: const Text('ورش'),
-                selected: widget.isWarshEdition,
-                onSelected: (_) => widget.onToggleEdition(true),
-              ),
-              ChoiceChip(
-                label: const Text('التجويد الملون'),
-                selected: !widget.isWarshEdition,
-                onSelected: (_) => widget.onToggleEdition(false),
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove),
-                    onPressed: () { if (_fontSize > 16) setState(() => _fontSize -= 2); },
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: HollowWorldPainter(
+                    cameraPos: _cameraPos,
+                    playerPos: _playerPos,
+                    playerSize: _playerSize,
+                    facing: _facing,
+                    dashTime: _dashTime,
+                    invulnTimer: _invulnTimer,
+                    slashTimer: _slashTimer,
+                    slashDir: _currentSlashDir,
+                    slashHitbox: _getSlashHitbox(),
+                    masks: _masks,
+                    maxMasks: _maxMasks,
+                    soul: _soul,
+                    platforms: _platforms,
+                    enemies: _enemies,
+                    ghosts: _ghosts,
+                    particles: _particles,
+                    spores: _spores,
+                    spells: _spells,
+                    shockwaves: _shockwaves,
+                    bossDefeated: _bossDefeated,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: () { if (_fontSize < 36) setState(() => _fontSize += 2); },
+                ),
+              ),
+
+              Positioned(
+                top: 18,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.45),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white24),
                   ),
-                ],
+                  child: const Text(
+                    'اضرب للأسفل في الهواء (↓ + سيف) للقفز الارتدادي Nail Pogo فوق الأشواك والأعداء',
+                    style: TextStyle(color: Color(0xFFCFD8E3), fontSize: 11.5),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: 20,
+                bottom: 22,
+                child: _buildDirectionalPad(),
+              ),
+              Positioned(
+                right: 22,
+                bottom: 22,
+                child: _buildActionButtons(),
+              ),
+
+              if (_isGameOver || _bossDefeated) _buildOverlayBanner(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDirectionalPad() {
+    return SizedBox(
+      width: 176,
+      height: 156,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 48,
+            child: _touchHoldButton(
+              icon: Icons.keyboard_arrow_left_rounded,
+              active: _moveLeft,
+              onChanged: (v) => setState(() => _moveLeft = v),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 48,
+            child: _touchHoldButton(
+              icon: Icons.keyboard_arrow_right_rounded,
+              active: _moveRight,
+              onChanged: (v) => setState(() => _moveRight = v),
+            ),
+          ),
+          Positioned(
+            left: 58,
+            top: 0,
+            child: _touchHoldButton(
+              icon: Icons.keyboard_arrow_up_rounded,
+              active: _aimUp,
+              size: 52,
+              onChanged: (v) => setState(() => _aimUp = v),
+            ),
+          ),
+          Positioned(
+            left: 58,
+            bottom: 0,
+            child: _touchHoldButton(
+              icon: Icons.keyboard_arrow_down_rounded,
+              active: _aimDown,
+              size: 52,
+              onChanged: (v) => setState(() => _aimDown = v),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return SizedBox(
+      width: 190,
+      height: 155,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            bottom: 36,
+            child: _actionCircleButton(
+              label: 'X',
+              subLabel: 'NAIL',
+              color: const Color(0xFFE2EBF5),
+              onTapDown: _triggerNailSlash,
+            ),
+          ),
+          Positioned(
+            right: 60,
+            bottom: 0,
+            child: Listener(
+              onPointerDown: (_) {
+                _jumpHeld = true;
+                if (_jumpsRemaining > 0) {
+                  _jumpsRemaining--;
+                  _playerVel = Offset(_playerVel.dx, -540.0);
+                  _onGround = false;
+                  _spawnHitParticles(
+                    _playerPos + const Offset(0, 22),
+                    const Color(0xFFD6E4F0),
+                    8,
+                  );
+                }
+              },
+              onPointerUp: (_) => _jumpHeld = false,
+              onPointerCancel: (_) => _jumpHeld = false,
+              child: _styledButtonVisual('A', 'JUMP', const Color(0xFF9AC5F4)),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 48,
+            child: _actionCircleButton(
+              label: 'RT',
+              subLabel: 'DASH',
+              color: const Color(0xFF8A99AD),
+              onTapDown: () {
+                if (_dashCooldown <= 0) {
+                  _dashTime = 0.16;
+                  _dashCooldown = 0.55;
+                  _screenShake = 4.5;
+                  _spawnHitParticles(_playerPos, const Color(0xFF1A1E29), 12);
+                }
+              },
+            ),
+          ),
+          Positioned(
+            left: 64,
+            top: 0,
+            child: _actionCircleButton(
+              label: 'B',
+              subLabel: 'SOUL',
+              color: _soul >= 33 ? const Color(0xFFFFFFFF) : const Color(0xFF556070),
+              onTapDown: _castSoulOrHeal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _touchHoldButton({
+    required IconData icon,
+    required bool active,
+    required ValueChanged<bool> onChanged,
+    double size = 58,
+  }) {
+    return Listener(
+      onPointerDown: (_) => onChanged(true),
+      onPointerUp: (_) => onChanged(false),
+      onPointerCancel: (_) => onChanged(false),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: active ? Colors.white.withOpacity(0.28) : Colors.black.withOpacity(0.45),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: active ? Colors.white : Colors.white38,
+            width: 1.8,
+          ),
+        ),
+        child: Icon(icon, color: Colors.white, size: size * 0.62),
+      ),
+    );
+  }
+
+  Widget _actionCircleButton({
+    required String label,
+    required String subLabel,
+    required Color color,
+    required VoidCallback onTapDown,
+  }) {
+    return Listener(
+      onPointerDown: (_) => onTapDown(),
+      child: _styledButtonVisual(label, subLabel, color),
+    );
+  }
+
+  Widget _styledButtonVisual(String label, String subLabel, Color color) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.52),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withOpacity(0.85), width: 2.0),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.2), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            subLabel,
+            style: TextStyle(
+              color: color.withOpacity(0.75),
+              fontSize: 8.5,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlayBanner() {
+    return Positioned(
+      top: 90,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF070A10).withOpacity(0.92),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD6E4F0), width: 1.5),
+            boxShadow: const [
+              BoxShadow(color: Colors.black87, blurRadius: 24),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _isGameOver ? 'SHADE BROKEN' : 'SENTINEL VANQUISHED',
+                style: TextStyle(
+                  color: _isGameOver ? const Color(0xFFFF7A30) : const Color(0xFFE8F4FF),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _isGameOver
+                    ? 'لقد تحطم قناعك في أعماق الكهف المظلم'
+                    : 'انتصرت على حارس الكهف العملاق وأتقنت فنون السيف والروح!',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD6E4F0),
+                  foregroundColor: const Color(0xFF070A10),
+                ),
+                onPressed: _initWorld,
+                child: const Text(
+                  'إعادة خوض الرحلة',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
         ),
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF0A4D3C)))
-              : _errorMessage != null
-                  ? Center(child: Text(_errorMessage!))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _ayahs.length,
-                      itemBuilder: (context, index) {
-                        final ayah = _ayahs[index];
-                        final isBookmarked = widget.bookmarkedAyah == ayah.numberInSurah;
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          color: isBookmarked ? const Color(0xFFFFF9E6) : Colors.white,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text('الآية ${ayah.numberInSurah} (صفحة ${ayah.page})', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                    IconButton(
-                                      icon: Icon(isBookmarked ? Icons.bookmark : Icons.bookmark_border, color: const Color(0xFFD4AF37)),
-                                      onPressed: () => widget.onBookmarkAyah(ayah.numberInSurah),
-                                    ),
-                                  ],
-                                ),
-                                RichText(
-                                  textAlign: TextAlign.right,
-                                  text: TextSpan(
-                                    style: TextStyle(fontSize: _fontSize, height: 1.9, color: Colors.black87),
-                                    children: [
-                                      ...TajweedParser.parseTajweedText(ayah.text, widget.enableTajweedColors),
-                                      TextSpan(
-                                        text: ' ﴿${ayah.numberInSurah}﴾',
-                                        style: TextStyle(color: const Color(0xFF0A4D3C), fontSize: _fontSize * 0.8),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-        ),
-      ],
-    );
-  }
-}
-
-class TasbihScreenView extends StatefulWidget {
-  const TasbihScreenView({super.key});
-
-  @override
-  State<TasbihScreenView> createState() => _TasbihScreenViewState();
-}
-
-class _TasbihScreenViewState extends State<TasbihScreenView> {
-  int _counter = 0;
-  int _totalCounter = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0A4D3C))),
-          const SizedBox(height: 25),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _counter++;
-                _totalCounter++;
-              });
-            },
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF0A4D3C),
-              ),
-              alignment: Alignment.center,
-              child: Text('$_counter', style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold)),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text('المجموع الكلي: $_totalCounter', style: const TextStyle(fontSize: 16, color: Colors.grey)),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () => setState(() => _counter = 0),
-            child: const Text('إعادة ضبط العداد'),
-          ),
-        ],
       ),
     );
   }
+}
+
+extension on EnemyEntity {
+  double VelXWithPatrol(double speed) => facing * speed + vel.dx;
+}
+
+// ==========================================
+// 9. المحرك الرسومي المخصص
+// ==========================================
+class HollowWorldPainter extends CustomPainter {
+  final Offset cameraPos;
+  final Offset playerPos;
+  final Size playerSize;
+  final int facing;
+  final double dashTime;
+  final double invulnTimer;
+  final double slashTimer;
+  final SlashDir slashDir;
+  final Rect slashHitbox;
+  final int masks;
+  final int maxMasks;
+  final double soul;
+  final List<PlatformRect> platforms;
+  final List<EnemyEntity> enemies;
+  final List<GhostAfterImage> ghosts;
+  final List<GameParticle> particles;
+  final List<AmbientSpore> spores;
+  final List<SoulSpellProjectile> spells;
+  final List<ShockwaveHazard> shockwaves;
+  final bool bossDefeated;
+
+  HollowWorldPainter({
+    required this.cameraPos,
+    required this.playerPos,
+    required this.playerSize,
+    required this.facing,
+    required this.dashTime,
+    required this.invulnTimer,
+    required this.slashTimer,
+    required this.slashDir,
+    required this.slashHitbox,
+    required this.masks,
+    required this.maxMasks,
+    required this.soul,
+    required this.platforms,
+    required this.enemies,
+    required this.ghosts,
+    required this.particles,
+    required this.spores,
+    required this.spells,
+    required this.shockwaves,
+    required this.bossDefeated,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect screenRect = Offset.zero & size;
+    final Paint bgPaint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF050811),
+          Color(0xFF0B1324),
+          Color(0xFF090D16),
+        ],
+      ).createShader(screenRect);
+    canvas.drawRect(screenRect, bgPaint);
+
+    _drawParallaxPillars(canvas, size, 0.25, const Color(0xFF0E1729), 140);
+    _drawParallaxPillars(canvas, size, 0.5, const Color(0xFF131F36), 95);
+
+    canvas.save();
+    canvas.translate(-cameraPos.dx, -cameraPos.dy);
+
+    for (final s in spores) {
+      final Paint sporePaint = Paint()
+        ..color = s.color.withOpacity(0.55)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawCircle(s.pos, s.radius, sporePaint);
+    }
+
+    _drawPlatformsAndSpikes(canvas);
+
+    for (final g in ghosts) {
+      _drawKnightCharacter(
+        canvas,
+        g.pos,
+        g.facing,
+        opacity: g.alpha * 0.65,
+        isShade: g.isShadeDash,
+      );
+    }
+
+    for (final enemy in enemies) {
+      _drawEnemy(canvas, enemy);
+    }
+
+    for (final sw in shockwaves) {
+      final Paint swPaint = Paint()
+        ..color = const Color(0xFFFF9233)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawOval(sw.bounds, swPaint);
+      canvas.drawOval(sw.bounds.deflate(5), Paint()..color = Colors.white);
+    }
+
+    final bool blinkHide = invulnTimer > 0 && ((invulnTimer * 25).floor() % 2 == 0);
+    if (!blinkHide) {
+      _drawKnightCharacter(
+        canvas,
+        playerPos,
+        facing,
+        isShade: dashTime > 0,
+      );
+    }
+
+    if (slashTimer > 0) {
+      _drawNailSlashArc(canvas);
+    }
+
+    for (final spell in spells) {
+      final Paint glow = Paint()
+        ..color = const Color(0xFF88D4FF).withOpacity(0.7)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      canvas.drawCircle(spell.pos, spell.radius * 1.35, glow);
+      canvas.drawCircle(spell.pos, spell.radius * 0.85, Paint()..color = Colors.white);
+    }
+
+    for (final p in particles) {
+      final double alpha = (p.life / p.maxLife).clamp(0.0, 1.0);
+      final Paint partPaint = Paint()
+        ..color = p.color.withOpacity(alpha)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+      canvas.drawCircle(p.pos, p.size * alpha, partPaint);
+    }
+
+    canvas.restore();
+
+    final Paint vignette = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 0.95,
+        colors: [
+          Colors.transparent,
+          Colors.black.withOpacity(0.65),
+        ],
+        stops: const [0.6, 1.0],
+      ).createShader(screenRect);
+    canvas.drawRect(screenRect, vignette);
+
+    _drawHollowKnightHUD(canvas, size);
+  }
+
+  void _drawParallaxPillars(
+    Canvas canvas,
+    Size size,
+    double factor,
+    Color color,
+    double width,
+  ) {
+    final Paint paint = Paint()..color = color;
+    final double offset = -(cameraPos.dx * factor) % (width * 3.2);
+    for (double x = offset - width; x < size.width + width; x += width * 3.2) {
+      canvas.drawRect(Rect.fromLTWH(x, 0, width, size.height), paint);
+    }
+  }
+
+  void _drawPlatformsAndSpikes(Canvas canvas) {
+    for (final plat in platforms) {
+      if (plat.isHazard) {
+        final Path spikePath = Path();
+        const double spikeW = 18.0;
+        for (double x = plat.rect.left; x < plat.rect.right; x += spikeW) {
+          spikePath.moveTo(x, plat.rect.bottom);
+          spikePath.lineTo(x + spikeW / 2, plat.rect.top - 8);
+          spikePath.lineTo(x + spikeW, plat.rect.bottom);
+        }
+        spikePath.close();
+        canvas.drawPath(spikePath, Paint()..color = const Color(0xFF9BA8B8));
+        canvas.drawPath(
+          spikePath,
+          Paint()
+            ..color = const Color(0xFFDCE6F2)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+        );
+      } else {
+        final RRect rrect = RRect.fromRectAndRadius(plat.rect, const Radius.circular(6));
+        canvas.drawRRect(rrect, Paint()..color = const Color(0xFF141B29));
+        canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = const Color(0xFF334460)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0,
+        );
+      }
+    }
+  }
+
+  void _drawKnightCharacter(
+    Canvas canvas,
+    Offset center,
+    int dir, {
+    double opacity = 1.0,
+    bool isShade = false,
+  }) {
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(dir.toDouble(), 1.0);
+
+    final Paint cloakPaint = Paint()
+      ..color = (isShade ? const Color(0xFF080A0F) : const Color(0xFF263142)).withOpacity(opacity);
+    final Path cloak = Path()
+      ..moveTo(-12, -4)
+      ..lineTo(10, -4)
+      ..lineTo(15, 23)
+      ..lineTo(3, 18)
+      ..lineTo(-5, 24)
+      ..lineTo(-16, 21)
+      ..close();
+    canvas.drawPath(cloak, cloakPaint);
+
+    final Paint headPaint = Paint()
+      ..color = (isShade ? const Color(0xFF11131A) : const Color(0xFFF4F8FC)).withOpacity(opacity);
+    final RRect head = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: const Offset(0, -10), width: 24, height: 22),
+      const Radius.circular(9),
+    );
+    canvas.drawRRect(head, headPaint);
+
+    final Path horns = Path()
+      ..moveTo(-9, -16)
+      ..quadraticBezierTo(-17, -30, -7, -36)
+      ..quadraticBezierTo(-10, -24, -4, -18)
+      ..moveTo(9, -16)
+      ..quadraticBezierTo(17, -30, 7, -36)
+      ..quadraticBezierTo(10, -24, 4, -18)
+      ..close();
+    canvas.drawPath(horns, headPaint);
+
+    final Paint eyePaint = Paint()
+      ..color = (isShade ? const Color(0xFFE6F4FF) : const Color(0xFF090C12)).withOpacity(opacity);
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(5, -9), width: 5.5, height: 8.5),
+      eyePaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: const Offset(-2, -9), width: 4.5, height: 7.5),
+      eyePaint,
+    );
+
+    canvas.restore();
+  }
+
+  void _drawNailSlashArc(Canvas canvas) {
+    final Paint slashPaint = Paint()
+      ..color = Colors.white.withOpacity((slashTimer / 0.14).clamp(0.0, 1.0))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9.0
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
+
+    double startAngle = -0.7;
+    double sweepAngle = 1.4;
+
+    if (slashDir == SlashDir.left) {
+      startAngle = pi - 0.7;
+    } else if (slashDir == SlashDir.up) {
+      startAngle = -pi / 2 - 0.7;
+    } else if (slashDir == SlashDir.down) {
+      startAngle = pi / 2 - 0.7;
+    }
+
+    canvas.drawArc(slashHitbox, startAngle, sweepAngle, false, slashPaint);
+  }
+
+  void _drawEnemy(Canvas canvas, EnemyEntity e) {
+    final bool isFlashing = e.flashTimer > 0;
+    final Color bodyColor = isFlashing
+        ? Colors.white
+        : (e.type == EnemyType.falseGuardBoss
+            ? const Color(0xFF283347)
+            : const Color(0xFF323E52));
+
+    final RRect bodyRect = RRect.fromRectAndRadius(
+      e.bounds,
+      Radius.circular(e.type == EnemyType.falseGuardBoss ? 18 : 12),
+    );
+    canvas.drawRRect(bodyRect, Paint()..color = bodyColor);
+    canvas.drawRRect(
+      bodyRect,
+      Paint()
+        ..color = const Color(0xFF6B7D99)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+
+    if (e.type == EnemyType.flyinghusks) {
+      final double wingOffset = sin(e.aiTimer * 6) * 8;
+      final Paint wingPaint = Paint()..color = Colors.white.withOpacity(0.45);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: e.pos + Offset(-16, -12 + wingOffset),
+          width: 22,
+          height: 10,
+        ),
+        wingPaint,
+      );
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: e.pos + Offset(16, -12 + wingOffset),
+          width: 22,
+          height: 10,
+        ),
+        wingPaint,
+      );
+    }
+
+    if (e.type == EnemyType.falseGuardBoss) {
+      final double maceX = e.pos.dx + e.facing * 52;
+      final double maceY = e.bossState == 1 ? e.pos.dy - 45 : e.pos.dy + 12;
+      canvas.drawLine(
+        e.pos,
+        Offset(maceX, maceY),
+        Paint()
+          ..color = const Color(0xFF8C9BB0)
+          ..strokeWidth = 5,
+      );
+      canvas.drawCircle(
+        Offset(maceX, maceY),
+        20,
+        Paint()..color = isFlashing ? Colors.white : const Color(0xFF1B2230),
+      );
+    }
+
+    final Offset eyeCenter = e.pos + Offset(e.facing * (e.size.width * 0.22), -e.size.height * 0.15);
+    canvas.drawCircle(
+      eyeCenter,
+      e.type == EnemyType.falseGuardBoss ? 9.0 : 5.0,
+      Paint()
+        ..color = const Color(0xFFFF881B)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    canvas.drawCircle(
+      eyeCenter,
+      e.type == EnemyType.falseGuardBoss ? 4.5 : 2.5,
+      Paint()..color = const Color(0xFFFFE0B2),
+    );
+  }
+
+  void _drawHollowKnightHUD(Canvas canvas, Size size) {
+    const Offset vesselCenter = Offset(52, 48);
+    const double vesselRadius = 28.0;
+
+    canvas.drawCircle(
+      vesselCenter,
+      vesselRadius,
+      Paint()..color = const Color(0xFF121722),
+    );
+
+    canvas.save();
+    final Path clipCircle = Path()
+      ..addOval(Rect.fromCircle(center: vesselCenter, radius: vesselRadius - 3));
+    canvas.clipPath(clipCircle);
+
+    final double fillHeight = (soul / 100.0) * (vesselRadius * 2);
+    final Rect soulRect = Rect.fromLTWH(
+      vesselCenter.dx - vesselRadius,
+      vesselCenter.dy + vesselRadius - fillHeight,
+      vesselRadius * 2,
+      fillHeight,
+    );
+    canvas.drawRect(
+      soulRect,
+      Paint()
+        ..color = soul >= 33 ? const Color(0xFFF2F9FF) : const Color(0xFF8CA0B8)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    );
+    canvas.restore();
+
+    canvas.drawCircle(
+      vesselCenter,
+      vesselRadius,
+      Paint()
+        ..color = const Color(0xFFD8E4F0)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2,
+    );
+
+    for (int i = 0; i < maxMasks; i++) {
+      final Offset maskPos = Offset(102.0 + i * 32.0, 46.0);
+      final bool isFull = i < masks;
+
+      final RRect maskShape = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: maskPos, width: 22, height: 26),
+        const Radius.circular(9),
+      );
+
+      if (isFull) {
+        canvas.drawRRect(maskShape, Paint()..color = const Color(0xFFF2F7FC));
+        canvas.drawOval(
+          Rect.fromCenter(center: maskPos + const Offset(-4, 1), width: 4.5, height: 7),
+          Paint()..color = const Color(0xFF0E131D),
+        );
+        canvas.drawOval(
+          Rect.fromCenter(center: maskPos + const Offset(4, 1), width: 4.5, height: 7),
+          Paint()..color = const Color(0xFF0E131D),
+        );
+      } else {
+        canvas.drawRRect(
+          maskShape,
+          Paint()
+            ..color = const Color(0xFF4A586E)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0,
+        );
+      }
+    }
+
+    for (final e in enemies) {
+      if (e.type == EnemyType.falseGuardBoss && (playerPos.dx - e.pos.dx).abs() < 850) {
+        final double barW = min(360.0, size.width * 0.45);
+        final Rect bgBar = Rect.fromCenter(
+          center: Offset(size.width / 2, 36),
+          width: barW,
+          height: 12,
+        );
+        final double hpRatio = (e.hp / e.maxHp).clamp(0.0, 1.0);
+        final Rect fgBar = Rect.fromLTWH(bgBar.left, bgBar.top, barW * hpRatio, 12);
+
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(bgBar, const Radius.circular(6)),
+          Paint()..color = const Color(0xFF121824),
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(fgBar, const Radius.circular(6)),
+          Paint()..color = const Color(0xFFFF8424),
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(bgBar, const Radius.circular(6)),
+          Paint()
+            ..color = const Color(0xFFDCE6F2)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant HollowWorldPainter oldDelegate) => true;
 }
