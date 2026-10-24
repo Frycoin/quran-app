@@ -1,0 +1,45 @@
+cat << 'EOF' > .github/workflows/build.yml
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Configure Android Project
+        run: |
+          cp -r lib lib_backup
+          flutter create --platforms=android --org com.app.quran .
+          rm -rf lib
+          mv lib_backup lib
+          flutter pub add http audioplayers
+          sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: quran-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+EOF
